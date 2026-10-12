@@ -11,6 +11,7 @@
 - [Обучающий корпус: точный источник и количество](docs/training-corpus.md).
 - [Этапы превращения base-модели в чат](docs/chat-training.md).
 - [Память и скорость обучения](docs/training-memory.md).
+- [Экономия квоты Colab: бенчмарк текущего trainer](docs/colab-efficiency.md).
 
 - [Архитектура и оценки памяти](docs/architecture.md).
 - [DeepSeek V4.1: исследование и изменения архитектуры v0.3](docs/deepseek-v41-review.md).

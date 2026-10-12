@@ -79,6 +79,8 @@ GRAD_ACCUM = 4
 PRECISION = 'auto_master'     # auto: fp16_master T4, bf16_master supported GPUs, fp32 CPU
 OPTIMIZER = 'adamw'           # optional adamw8bit; не меняйте optimizer при exact resume
 CHECKPOINT_BLOCKS = True
+RUN_EFFICIENCY_BENCHMARK = False  # optional: restore all test updates, apply fastest batch layout
+COMPUTE_UNITS_PER_HOUR = 8.9     # enter the CURRENT Colab rate for this GPU
 DOCUMENTS_PER_LANGUAGE = 10000
 VALIDATION_DOCUMENTS = 128    # при продолжении сохраняем старые 32 вместо новых 128
 MAX_CHARACTERS_PER_LANGUAGE = 30_000_000
@@ -258,8 +260,14 @@ trainer = Trainer(model_cfg, train_cfg, CACHE_DIR, RUN_DIR, resume=resume_path,
 remaining_tokens = max(TOTAL_TOKENS-trainer.tokens_seen, 0)
 print('Parameter dtype:', next(trainer.model.parameters()).dtype)
 print('Total updates:', steps, 'session max:', SESSION_UPDATES, 'tokens/update:', per_step)
-print('Remaining tokens:', remaining_tokens, 'rough hours at observed ~102 tokens/s:', remaining_tokens/102/3600)
+print('Remaining tokens:', remaining_tokens, '(time depends on measured throughput on this GPU)')
+''' + 'exec(' + repr((ROOT/'scripts/colab_efficiency.py').read_text()) + ')\n' + '''
+fix_evaluation_microbatch(trainer, 1)
 print('Initial validation for current evaluator:', trainer.evaluate())
+if RUN_EFFICIENCY_BENCHMARK:
+    if not trainer.optimizer.state:
+        trainer.run(max_updates=1)  # real first update allocates Adam states
+    benchmark_batch_layout(trainer, units_per_hour=COMPUTE_UNITS_PER_HOUR)
 ''')
 markdown('''
 ## Обучение текущей сессии
@@ -269,6 +277,12 @@ Local full checkpoint и persistent weights сохраняются каждые 
 без двойной записи на последнем update. Phase-wide load metrics дополняют last-update routing.
 После завершения ячейки можно выполнить её ещё раз: модель/optimizer в памяти продолжают сессию.
 После потери runtime auto загрузит weights из Drive с явным warm restart.
+
+На GPU с большим запасом VRAM включите `RUN_EFFICIENCY_BENCHMARK`: сравниваются
+разбиения одного effective batch и отключение block checkpointing. Тестовые updates
+откатываются вместе с Adam/RNG; выбранная настройка применяется к текущему trainer.
+Перед следующим reload перепишите MICROBATCH/GRAD_ACCUM/CHECKPOINT_BLOCKS по результату.
+Validation остаётся на microbatch=1. Подробности: `docs/colab-efficiency.md`.
 ''')
 code('''
 start = time.perf_counter()
