@@ -1,0 +1,78 @@
+{
+  "source": "local",
+  "source_config": null,
+  "source_dataset": null,
+  "source_revision": null,
+  "requested_documents_per_language": 12,
+  "validation_documents_per_language": 2,
+  "max_characters_per_document": 20000,
+  "min_characters_per_document": 200,
+  "scanned_documents": {
+    "uk": 12,
+    "en": 12
+  },
+  "document_counts": {
+    "uk": {
+      "train": 10,
+      "val": 2
+    },
+    "en": {
+      "train": 10,
+      "val": 2
+    }
+  },
+  "seed": 1234,
+  "document_hashes": {
+    "uk": {
+      "val": [
+        "c73bd3a815af42797eed8ffa7a6d9959763038ad4fba74d6c2a997fe7db3ec6a",
+        "604c174703544735038b9a0756363a89d3892a156a5af768ccc29008b8220eb5"
+      ],
+      "train": [
+        "915065be4daf4dce1efda8fe5154647a56c102c945d02b1d34b509263704921b",
+        "b5359e533632b07443fa69640da1b198adee42c5a353df4c66968809c5413b62",
+        "4f6ef9569028a5cf2724dfbda42f3cb8102a03a622f25426d6eb380c3214e4be",
+        "eaf702b6dbe0b457772c625678d55209707082ccdff0c3aec1fb894d0dc69b73",
+        "f4ca33abf992decff566df753a48878f32367f2d97b8307f0f50683540bde85f",
+        "67f4f03a8692dc0c602ce107058625e7b7b91c984c4660a7c3e926d92022bff4",
+        "ee34aa18501bc1ddf582847867145e8c5e35172db044bbcd33f9d9b52e7ab343",
+        "f99e5865d3dfb53c01bc589a012379d83cb65c52f3e7fc2bd84e9039d535b2d6",
+        "65696218a575927dcab7bc3fddad003a582c0ffcee7cf06db44ca9ff86eef9c6",
+        "7dd2f3ee58045ab15b089c0d4178b85fc5e42475e21783d4a5dc8f9ab62d4cf6"
+      ]
+    },
+    "en": {
+      "val": [
+        "ea17346d72e34934d3cb6c56d548091c8e544311634b45afcde6500f974a82cc",
+        "c17fa6a043e26e881c3d6c6aac752e06f05e7a5b9752ebbd1f1d91f3ced2a654"
+      ],
+      "train": [
+        "9bb03b6a5ec7498eed62bb7f1a2bdb042667a859ad48a753320e1dcc48f4dc7f",
+        "e39141ab71b23231fc1e4d8a1839da5262fd7a713938a2a142eb2550a5b7d16e",
+        "465ec774dace7d227c8584c9e1846aa2ae11d0a5ac51dcf72b713a6e7ac76472",
+        "8f4d68ab1c0e80e11c222732941ca0cdd84677837c736b4d1e8d186193786e93",
+        "1989bb3855aa26ef1900796ece7600c99f937794c4a2b39a49aff901f265e3f8",
+        "7f34eeeee429fad30865969f209493be381c6e23441f637f632daa0b7317cef1",
+        "27f8db6a207eb7d90a31c8a3f73ea3712fad384c2fa348026a1dafb0b1b63e14",
+        "99698d49ae7bea18cffd8e7c100e9ad81178a2d9a87b01a073d4353aad32bba1",
+        "94be6709be3b71019986003bfc0100c4df4fa25dc0953a39379163aaae3b6ecf",
+        "dbed7066efc129d0fd8406a9fda8f21e7a3a5aaba4887e4395945385334a23e7"
+      ]
+    }
+  },
+  "requested_vocab": 65536,
+  "actual_vocab": 549,
+  "normalization": "none; byte-level BPE",
+  "special_ids": {
+    "<pad>": 0,
+    "<bos>": 1,
+    "<eos>": 2,
+    "<unk>": 3
+  },
+  "tokens": {
+    "train_uk": 2830,
+    "val_uk": 590,
+    "train_en": 2710,
+    "val_en": 566
+  }
+}

@@ -1,0 +1,2067 @@
+{
+  "schema_version": "0.4-size-family-draft",
+  "checked_at": "2026-10-11",
+  "architecture_version": "0.3",
+  "purpose": "10 proposed architectural sizes, not trained checkpoints or hardware selection",
+  "units": {
+    "parameters": "scalar count; decimal B=10^9, T=10^12",
+    "memory": "GiB=2^30 bytes"
+  },
+  "requirements": {
+    "languages": [
+      "uk",
+      "en"
+    ],
+    "context_stages_tokens": [
+      32768,
+      131072,
+      262144
+    ],
+    "bounded_total_cache_required": false,
+    "memory_edit_details": "deferred by user"
+  },
+  "assumptions": {
+    "baseline": "one Engram module, four-stream GR, all decoder FFNs are MoE; two consecutive full layers share one KV owner",
+    "full_attention_fraction": 0.25,
+    "full_kv_prefix_retained": true,
+    "cross_layer_kv_group_size": 2,
+    "ced_decoder_prefill_skipped": false,
+    "gdn_prefill_state_retained": true,
+    "ngram_rows": "eight distinct nearby primes; capacity proposal, not an optimized collision policy",
+    "expert_activation": "bias-free SwiGLU",
+    "active_convention": "all non-routed neural matrices including tied full vocab head + selected experts + fetched table scalars",
+    "kv_dtype": "bfloat16",
+    "gdn_state_dtype": "float32",
+    "mixed_weight_format": "4-bit routed experts; all other neural and table weights BF16",
+    "full_training_state": "BF16 weights and gradients, FP32 master weights and Adam moments: 16 bytes per parameter",
+    "table_residency": "GPU/RAM/shards undecided; offload does not remove total stored bytes",
+    "exclusions": [
+      "remaining small mixer normalization/service parameters",
+      "quantization scales, padding and metadata",
+      "edit metadata, token-prefix buffer and GPU table cache",
+      "activations beyond one illustrative live GR buffer",
+      "logits, kernel workspace, dispatch, communication and allocator memory"
+    ],
+    "estimated_training_states_are_peak_vram": false,
+    "suggested_ngram_allocation_is_empirically_optimal": false
+  },
+  "formula_reference": "../docs/architecture.md",
+  "design_reference": "../docs/model-family.md",
+  "source_reference": "../docs/model-size-references.md",
+  "profiles": [
+    {
+      "id": "nm-0.2b-e0.1b-gr",
+      "nominal_neural_parameters_B": 0.2,
+      "nominal_ngram_parameters_B": 0.1,
+      "L": 12,
+      "d": 512,
+      "E": 16,
+      "k": 2,
+      "f": 448,
+      "V": 65536,
+      "shared_experts": 1,
+      "shared_expert_width": 448,
+      "tie_word_embeddings": true,
+      "hq": 8,
+      "hkv": 2,
+      "dh": 64,
+      "hk": 4,
+      "hv": 8,
+      "dk": 64,
+      "dv": 64,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "kv_sharing": {
+        "type": "cross_layer_gqa",
+        "group_size_full_layers": 2,
+        "full_attention_layers_1based": [
+          4,
+          8,
+          12
+        ],
+        "source_layer_indices_1based": [
+          4,
+          12
+        ],
+        "source_by_full_layer_1based": {
+          "4": 4,
+          "8": 4,
+          "12": 12
+        },
+        "source_builds_kv_from": "its own GR attention read",
+        "keys_and_values_shared": true,
+        "queries_output_gates_outputs": "independent per full layer",
+        "receiver_has_own_kv_projection": false,
+        "rope_head_dims_kv_dtype": "identical within each sharing group",
+        "persist_full_prefix": true,
+        "unshared_model_semantics_preserved": false,
+        "requires_training_and_recall_validation": true
+      },
+      "gdn_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 64,
+        "wrappers_per_layer": 2,
+        "final_read_only": true
+      },
+      "engram": {
+        "num_modules": 1,
+        "layer_indices_1based": [
+          2
+        ],
+        "ngram_orders": [
+          2,
+          3
+        ],
+        "hash_heads_per_order": 4,
+        "rows_per_order_head": {
+          "2": [
+            390647,
+            390653,
+            390671,
+            390673
+          ],
+          "3": [
+            390703,
+            390707,
+            390721,
+            390727
+          ]
+        },
+        "row_dim": 32,
+        "conv_kernel": 4,
+        "conv_dilation": 3,
+        "fusion": "branch-specific keys/gates and shared value before mixer"
+      },
+      "estimate": {
+        "neural_parts_parameters": {
+          "tied_embedding_head": 33554432,
+          "routed_experts": 132120576,
+          "shared_experts": 8257536,
+          "routers": 98304,
+          "gated_gqa": 2621440,
+          "gdn": 9548496,
+          "gated_residual": 6801408,
+          "engram_adapter": 669696
+        },
+        "neural_parameters": 193671888,
+        "ngram_table_parameters": 100016064,
+        "total_parameters": 293687952,
+        "active_parameters_convention": 78066640,
+        "gqa_parameter_breakdown": {
+          "independent_queries_output_gates_and_outputs": 2359296,
+          "unique_source_keys_and_values": 262144
+        },
+        "comparison_no_kv_sharing": {
+          "neural_parameters": 193802960,
+          "active_parameters_convention": 78197712,
+          "removed_duplicate_kv_projection_parameters": 131072
+        },
+        "active_shared_and_nonexpert_parameters": 61551312,
+        "active_routed_expert_parameters": 16515072,
+        "table_touched_scalars_per_token": 256,
+        "bf16_neural_weights_GiB": 0.3607420027256012,
+        "bf16_ngram_weights_GiB": 0.18629443645477295,
+        "mixed_neural_weights_lower_GiB": 0.1761716902256012,
+        "full_training_adam_neural_state_GiB": 2.8859360218048096,
+        "full_training_adam_ngram_state_GiB": 1.4903554916381836,
+        "full_training_adam_total_state_GiB": 4.376291513442993,
+        "cache_batch1_bf16": {
+          "32768": {
+            "kv_bytes": 33554432,
+            "kv_GiB": 0.03125,
+            "unshared_hybrid_kv_GiB": 0.046875,
+            "all_full_same_heads_kv_GiB": 0.1875
+          },
+          "131072": {
+            "kv_bytes": 134217728,
+            "kv_GiB": 0.125,
+            "unshared_hybrid_kv_GiB": 0.1875,
+            "all_full_same_heads_kv_GiB": 0.75
+          },
+          "262144": {
+            "kv_bytes": 268435456,
+            "kv_GiB": 0.25,
+            "unshared_hybrid_kv_GiB": 0.375,
+            "all_full_same_heads_kv_GiB": 1.5
+          }
+        },
+        "fixed_decode_state": {
+          "gdn_recurrent_fp32_bytes": 1179648,
+          "gdn_conv_bf16_bytes": 55296,
+          "engram_conv_bf16_bytes": 36864,
+          "total_GiB": 0.0011844635009765625
+        },
+        "one_live_gr_buffer_bf16_GiB": {
+          "8192": 0.03125,
+          "32768": 0.125,
+          "262144": 1.0
+        },
+        "status": "analytical, excludes small service parameters; no trained model or measured VRAM"
+      }
+    },
+    {
+      "id": "nm-0.5b-e0.2b-gr",
+      "nominal_neural_parameters_B": 0.5,
+      "nominal_ngram_parameters_B": 0.2,
+      "L": 16,
+      "d": 768,
+      "E": 24,
+      "k": 2,
+      "f": 448,
+      "V": 65536,
+      "shared_experts": 1,
+      "shared_expert_width": 448,
+      "tie_word_embeddings": true,
+      "hq": 12,
+      "hkv": 2,
+      "dh": 64,
+      "hk": 6,
+      "hv": 12,
+      "dk": 64,
+      "dv": 64,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "kv_sharing": {
+        "type": "cross_layer_gqa",
+        "group_size_full_layers": 2,
+        "full_attention_layers_1based": [
+          4,
+          8,
+          12,
+          16
+        ],
+        "source_layer_indices_1based": [
+          4,
+          12
+        ],
+        "source_by_full_layer_1based": {
+          "4": 4,
+          "8": 4,
+          "12": 12,
+          "16": 12
+        },
+        "source_builds_kv_from": "its own GR attention read",
+        "keys_and_values_shared": true,
+        "queries_output_gates_outputs": "independent per full layer",
+        "receiver_has_own_kv_projection": false,
+        "rope_head_dims_kv_dtype": "identical within each sharing group",
+        "persist_full_prefix": true,
+        "unshared_model_semantics_preserved": false,
+        "requires_training_and_recall_validation": true
+      },
+      "gdn_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 96,
+        "wrappers_per_layer": 2,
+        "final_read_only": true
+      },
+      "engram": {
+        "num_modules": 1,
+        "layer_indices_1based": [
+          2
+        ],
+        "ngram_orders": [
+          2,
+          3
+        ],
+        "hash_heads_per_order": 4,
+        "rows_per_order_head": {
+          "2": [
+            781271,
+            781283,
+            781301,
+            781307
+          ],
+          "3": [
+            781309,
+            781321,
+            781327,
+            781351
+          ]
+        },
+        "row_dim": 32,
+        "conv_kernel": 4,
+        "conv_dilation": 3,
+        "fusion": "branch-specific keys/gates and shared value before mixer"
+      },
+      "estimate": {
+        "neural_parts_parameters": {
+          "tied_embedding_head": 50331648,
+          "routed_experts": 396361728,
+          "shared_experts": 16515072,
+          "routers": 294912,
+          "gated_gqa": 7471104,
+          "gdn": 28607520,
+          "gated_residual": 19958784,
+          "engram_adapter": 1004544
+        },
+        "neural_parameters": 520545312,
+        "ngram_table_parameters": 200015040,
+        "total_parameters": 720560352,
+        "active_parameters_convention": 157213984,
+        "gqa_parameter_breakdown": {
+          "independent_queries_output_gates_and_outputs": 7077888,
+          "unique_source_keys_and_values": 393216
+        },
+        "comparison_no_kv_sharing": {
+          "neural_parameters": 520938528,
+          "active_parameters_convention": 157607200,
+          "removed_duplicate_kv_projection_parameters": 393216
+        },
+        "active_shared_and_nonexpert_parameters": 124183584,
+        "active_routed_expert_parameters": 33030144,
+        "table_touched_scalars_per_token": 256,
+        "bf16_neural_weights_GiB": 0.9695912003517151,
+        "bf16_ngram_weights_GiB": 0.37255704402923584,
+        "mixed_neural_weights_lower_GiB": 0.4158802628517151,
+        "full_training_adam_neural_state_GiB": 7.756729602813721,
+        "full_training_adam_ngram_state_GiB": 2.9804563522338867,
+        "full_training_adam_total_state_GiB": 10.737185955047607,
+        "cache_batch1_bf16": {
+          "32768": {
+            "kv_bytes": 33554432,
+            "kv_GiB": 0.03125,
+            "unshared_hybrid_kv_GiB": 0.0625,
+            "all_full_same_heads_kv_GiB": 0.25
+          },
+          "131072": {
+            "kv_bytes": 134217728,
+            "kv_GiB": 0.125,
+            "unshared_hybrid_kv_GiB": 0.25,
+            "all_full_same_heads_kv_GiB": 1.0
+          },
+          "262144": {
+            "kv_bytes": 268435456,
+            "kv_GiB": 0.25,
+            "unshared_hybrid_kv_GiB": 0.5,
+            "all_full_same_heads_kv_GiB": 2.0
+          }
+        },
+        "fixed_decode_state": {
+          "gdn_recurrent_fp32_bytes": 2359296,
+          "gdn_conv_bf16_bytes": 110592,
+          "engram_conv_bf16_bytes": 55296,
+          "total_GiB": 0.0023517608642578125
+        },
+        "one_live_gr_buffer_bf16_GiB": {
+          "8192": 0.046875,
+          "32768": 0.1875,
+          "262144": 1.5
+        },
+        "status": "analytical, excludes small service parameters; no trained model or measured VRAM"
+      }
+    },
+    {
+      "id": "nm-1b-e0.4b-gr",
+      "nominal_neural_parameters_B": 1,
+      "nominal_ngram_parameters_B": 0.4,
+      "L": 20,
+      "d": 1024,
+      "E": 32,
+      "k": 2,
+      "f": 384,
+      "V": 65536,
+      "shared_experts": 1,
+      "shared_expert_width": 384,
+      "tie_word_embeddings": true,
+      "hq": 8,
+      "hkv": 2,
+      "dh": 128,
+      "hk": 4,
+      "hv": 16,
+      "dk": 128,
+      "dv": 128,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "kv_sharing": {
+        "type": "cross_layer_gqa",
+        "group_size_full_layers": 2,
+        "full_attention_layers_1based": [
+          4,
+          8,
+          12,
+          16,
+          20
+        ],
+        "source_layer_indices_1based": [
+          4,
+          12,
+          20
+        ],
+        "source_by_full_layer_1based": {
+          "4": 4,
+          "8": 4,
+          "12": 12,
+          "16": 12,
+          "20": 20
+        },
+        "source_builds_kv_from": "its own GR attention read",
+        "keys_and_values_shared": true,
+        "queries_output_gates_outputs": "independent per full layer",
+        "receiver_has_own_kv_projection": false,
+        "rope_head_dims_kv_dtype": "identical within each sharing group",
+        "persist_full_prefix": true,
+        "unshared_model_semantics_preserved": false,
+        "requires_training_and_recall_validation": true
+      },
+      "gdn_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 128,
+        "wrappers_per_layer": 2,
+        "final_read_only": true
+      },
+      "engram": {
+        "num_modules": 1,
+        "layer_indices_1based": [
+          2
+        ],
+        "ngram_orders": [
+          2,
+          3
+        ],
+        "hash_heads_per_order": 4,
+        "rows_per_order_head": {
+          "2": [
+            781271,
+            781283,
+            781301,
+            781307
+          ],
+          "3": [
+            781309,
+            781321,
+            781327,
+            781351
+          ]
+        },
+        "row_dim": 64,
+        "conv_kernel": 4,
+        "conv_dilation": 3,
+        "fusion": "branch-specific keys/gates and shared value before mixer"
+      },
+      "estimate": {
+        "neural_parts_parameters": {
+          "tied_embedding_head": 67108864,
+          "routed_experts": 754974720,
+          "shared_experts": 23592960,
+          "routers": 655360,
+          "gated_gqa": 17301504,
+          "gdn": 110778720,
+          "gated_residual": 43814912,
+          "engram_adapter": 2650112
+        },
+        "neural_parameters": 1020877152,
+        "ngram_table_parameters": 400030080,
+        "total_parameters": 1420907232,
+        "active_parameters_convention": 313088864,
+        "gqa_parameter_breakdown": {
+          "independent_queries_output_gates_and_outputs": 15728640,
+          "unique_source_keys_and_values": 1572864
+        },
+        "comparison_no_kv_sharing": {
+          "neural_parameters": 1021925728,
+          "active_parameters_convention": 314137440,
+          "removed_duplicate_kv_projection_parameters": 1048576
+        },
+        "active_shared_and_nonexpert_parameters": 265902432,
+        "active_routed_expert_parameters": 47185920,
+        "table_touched_scalars_per_token": 512,
+        "bf16_neural_weights_GiB": 1.9015318751335144,
+        "bf16_ngram_weights_GiB": 0.7451140880584717,
+        "mixed_neural_weights_lower_GiB": 0.8468443751335144,
+        "full_training_adam_neural_state_GiB": 15.212255001068115,
+        "full_training_adam_ngram_state_GiB": 5.960912704467773,
+        "full_training_adam_total_state_GiB": 21.17316770553589,
+        "cache_batch1_bf16": {
+          "32768": {
+            "kv_bytes": 100663296,
+            "kv_GiB": 0.09375,
+            "unshared_hybrid_kv_GiB": 0.15625,
+            "all_full_same_heads_kv_GiB": 0.625
+          },
+          "131072": {
+            "kv_bytes": 402653184,
+            "kv_GiB": 0.375,
+            "unshared_hybrid_kv_GiB": 0.625,
+            "all_full_same_heads_kv_GiB": 2.5
+          },
+          "262144": {
+            "kv_bytes": 805306368,
+            "kv_GiB": 0.75,
+            "unshared_hybrid_kv_GiB": 1.25,
+            "all_full_same_heads_kv_GiB": 5.0
+          }
+        },
+        "fixed_decode_state": {
+          "gdn_recurrent_fp32_bytes": 15728640,
+          "gdn_conv_bf16_bytes": 276480,
+          "engram_conv_bf16_bytes": 73728,
+          "total_GiB": 0.014974594116210938
+        },
+        "one_live_gr_buffer_bf16_GiB": {
+          "8192": 0.0625,
+          "32768": 0.25,
+          "262144": 2.0
+        },
+        "status": "analytical, excludes small service parameters; no trained model or measured VRAM"
+      }
+    },
+    {
+      "id": "nm-3b-e1b-gr",
+      "nominal_neural_parameters_B": 3,
+      "nominal_ngram_parameters_B": 1,
+      "L": 24,
+      "d": 1536,
+      "E": 32,
+      "k": 2,
+      "f": 704,
+      "V": 65536,
+      "shared_experts": 1,
+      "shared_expert_width": 704,
+      "tie_word_embeddings": true,
+      "hq": 12,
+      "hkv": 2,
+      "dh": 128,
+      "hk": 6,
+      "hv": 24,
+      "dk": 128,
+      "dv": 128,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "kv_sharing": {
+        "type": "cross_layer_gqa",
+        "group_size_full_layers": 2,
+        "full_attention_layers_1based": [
+          4,
+          8,
+          12,
+          16,
+          20,
+          24
+        ],
+        "source_layer_indices_1based": [
+          4,
+          12,
+          20
+        ],
+        "source_by_full_layer_1based": {
+          "4": 4,
+          "8": 4,
+          "12": 12,
+          "16": 12,
+          "20": 20,
+          "24": 20
+        },
+        "source_builds_kv_from": "its own GR attention read",
+        "keys_and_values_shared": true,
+        "queries_output_gates_outputs": "independent per full layer",
+        "receiver_has_own_kv_projection": false,
+        "rope_head_dims_kv_dtype": "identical within each sharing group",
+        "persist_full_prefix": true,
+        "unshared_model_semantics_preserved": false,
+        "requires_training_and_recall_validation": true
+      },
+      "gdn_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 192,
+        "wrappers_per_layer": 2,
+        "final_read_only": true
+      },
+      "engram": {
+        "num_modules": 1,
+        "layer_indices_1based": [
+          2
+        ],
+        "ngram_orders": [
+          2,
+          3
+        ],
+        "hash_heads_per_order": 4,
+        "rows_per_order_head": {
+          "2": [
+            1953151,
+            1953157,
+            1953163,
+            1953167
+          ],
+          "3": [
+            1953233,
+            1953253,
+            1953269,
+            1953277
+          ]
+        },
+        "row_dim": 64,
+        "conv_kernel": 4,
+        "conv_dilation": 3,
+        "fusion": "branch-specific keys/gates and shared value before mixer"
+      },
+      "estimate": {
+        "neural_parts_parameters": {
+          "tied_embedding_head": 100663296,
+          "routed_experts": 2491416576,
+          "shared_experts": 77856768,
+          "routers": 1179648,
+          "gated_gqa": 44826624,
+          "gdn": 298933344,
+          "gated_residual": 117086208,
+          "engram_adapter": 3975168
+        },
+        "neural_parameters": 3135937632,
+        "ngram_table_parameters": 1000042880,
+        "total_parameters": 4135980512,
+        "active_parameters_convention": 800235104,
+        "gqa_parameter_breakdown": {
+          "independent_queries_output_gates_and_outputs": 42467328,
+          "unique_source_keys_and_values": 2359296
+        },
+        "comparison_no_kv_sharing": {
+          "neural_parameters": 3138296928,
+          "active_parameters_convention": 802594400,
+          "removed_duplicate_kv_projection_parameters": 2359296
+        },
+        "active_shared_and_nonexpert_parameters": 644521056,
+        "active_routed_expert_parameters": 155713536,
+        "table_touched_scalars_per_token": 512,
+        "bf16_neural_weights_GiB": 5.841139018535614,
+        "bf16_ngram_weights_GiB": 1.862725019454956,
+        "mixed_neural_weights_lower_GiB": 2.360670268535614,
+        "full_training_adam_neural_state_GiB": 46.72911214828491,
+        "full_training_adam_ngram_state_GiB": 14.901800155639648,
+        "full_training_adam_total_state_GiB": 61.63091230392456,
+        "cache_batch1_bf16": {
+          "32768": {
+            "kv_bytes": 100663296,
+            "kv_GiB": 0.09375,
+            "unshared_hybrid_kv_GiB": 0.1875,
+            "all_full_same_heads_kv_GiB": 0.75
+          },
+          "131072": {
+            "kv_bytes": 402653184,
+            "kv_GiB": 0.375,
+            "unshared_hybrid_kv_GiB": 0.75,
+            "all_full_same_heads_kv_GiB": 3.0
+          },
+          "262144": {
+            "kv_bytes": 805306368,
+            "kv_GiB": 0.75,
+            "unshared_hybrid_kv_GiB": 1.5,
+            "all_full_same_heads_kv_GiB": 6.0
+          }
+        },
+        "fixed_decode_state": {
+          "gdn_recurrent_fp32_bytes": 28311552,
+          "gdn_conv_bf16_bytes": 497664,
+          "engram_conv_bf16_bytes": 110592,
+          "total_GiB": 0.026933670043945312
+        },
+        "one_live_gr_buffer_bf16_GiB": {
+          "8192": 0.09375,
+          "32768": 0.375,
+          "262144": 3.0
+        },
+        "status": "analytical, excludes small service parameters; no trained model or measured VRAM"
+      }
+    },
+    {
+      "id": "nm-7b-e2b-gr",
+      "nominal_neural_parameters_B": 7,
+      "nominal_ngram_parameters_B": 2,
+      "L": 28,
+      "d": 2048,
+      "E": 64,
+      "k": 4,
+      "f": 512,
+      "V": 131072,
+      "shared_experts": 1,
+      "shared_expert_width": 512,
+      "tie_word_embeddings": true,
+      "hq": 16,
+      "hkv": 2,
+      "dh": 128,
+      "hk": 8,
+      "hv": 32,
+      "dk": 128,
+      "dv": 128,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "kv_sharing": {
+        "type": "cross_layer_gqa",
+        "group_size_full_layers": 2,
+        "full_attention_layers_1based": [
+          4,
+          8,
+          12,
+          16,
+          20,
+          24,
+          28
+        ],
+        "source_layer_indices_1based": [
+          4,
+          12,
+          20,
+          28
+        ],
+        "source_by_full_layer_1based": {
+          "4": 4,
+          "8": 4,
+          "12": 12,
+          "16": 12,
+          "20": 20,
+          "24": 20,
+          "28": 28
+        },
+        "source_builds_kv_from": "its own GR attention read",
+        "keys_and_values_shared": true,
+        "queries_output_gates_outputs": "independent per full layer",
+        "receiver_has_own_kv_projection": false,
+        "rope_head_dims_kv_dtype": "identical within each sharing group",
+        "persist_full_prefix": true,
+        "unshared_model_semantics_preserved": false,
+        "requires_training_and_recall_validation": true
+      },
+      "gdn_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 256,
+        "wrappers_per_layer": 2,
+        "final_read_only": true
+      },
+      "engram": {
+        "num_modules": 1,
+        "layer_indices_1based": [
+          2
+        ],
+        "ngram_orders": [
+          2,
+          3
+        ],
+        "hash_heads_per_order": 4,
+        "rows_per_order_head": {
+          "2": [
+            3906263,
+            3906269,
+            3906283,
+            3906293
+          ],
+          "3": [
+            3906307,
+            3906319,
+            3906323,
+            3906361
+          ]
+        },
+        "row_dim": 64,
+        "conv_kernel": 4,
+        "conv_dilation": 3,
+        "fusion": "branch-specific keys/gates and shared value before mixer"
+      },
+      "estimate": {
+        "neural_parts_parameters": {
+          "tied_embedding_head": 268435456,
+          "routed_experts": 5637144576,
+          "shared_experts": 88080384,
+          "routers": 3670016,
+          "gated_gqa": 92274688,
+          "gdn": 619835328,
+          "gated_residual": 241377280,
+          "engram_adapter": 5300224
+        },
+        "neural_parameters": 6956117952,
+        "ngram_table_parameters": 2000026752,
+        "total_parameters": 8956144704,
+        "active_parameters_convention": 1671295424,
+        "gqa_parameter_breakdown": {
+          "independent_queries_output_gates_and_outputs": 88080384,
+          "unique_source_keys_and_values": 4194304
+        },
+        "comparison_no_kv_sharing": {
+          "neural_parameters": 6959263680,
+          "active_parameters_convention": 1674441152,
+          "removed_duplicate_kv_projection_parameters": 3145728
+        },
+        "active_shared_and_nonexpert_parameters": 1318973376,
+        "active_routed_expert_parameters": 352321536,
+        "table_touched_scalars_per_token": 512,
+        "bf16_neural_weights_GiB": 12.95677936077118,
+        "bf16_ngram_weights_GiB": 3.7253401279449463,
+        "mixed_neural_weights_lower_GiB": 5.081779360771179,
+        "full_training_adam_neural_state_GiB": 103.65423488616943,
+        "full_training_adam_ngram_state_GiB": 29.80272102355957,
+        "full_training_adam_total_state_GiB": 133.456955909729,
+        "cache_batch1_bf16": {
+          "32768": {
+            "kv_bytes": 134217728,
+            "kv_GiB": 0.125,
+            "unshared_hybrid_kv_GiB": 0.21875,
+            "all_full_same_heads_kv_GiB": 0.875
+          },
+          "131072": {
+            "kv_bytes": 536870912,
+            "kv_GiB": 0.5,
+            "unshared_hybrid_kv_GiB": 0.875,
+            "all_full_same_heads_kv_GiB": 3.5
+          },
+          "262144": {
+            "kv_bytes": 1073741824,
+            "kv_GiB": 1.0,
+            "unshared_hybrid_kv_GiB": 1.75,
+            "all_full_same_heads_kv_GiB": 7.0
+          }
+        },
+        "fixed_decode_state": {
+          "gdn_recurrent_fp32_bytes": 44040192,
+          "gdn_conv_bf16_bytes": 774144,
+          "engram_conv_bf16_bytes": 147456,
+          "total_GiB": 0.041873931884765625
+        },
+        "one_live_gr_buffer_bf16_GiB": {
+          "8192": 0.125,
+          "32768": 0.5,
+          "262144": 4.0
+        },
+        "status": "analytical, excludes small service parameters; no trained model or measured VRAM"
+      }
+    },
+    {
+      "id": "nm-20b-e5b-gr",
+      "nominal_neural_parameters_B": 20,
+      "nominal_ngram_parameters_B": 5,
+      "L": 32,
+      "d": 2048,
+      "E": 64,
+      "k": 4,
+      "f": 1472,
+      "V": 131072,
+      "shared_experts": 1,
+      "shared_expert_width": 1472,
+      "tie_word_embeddings": true,
+      "hq": 16,
+      "hkv": 2,
+      "dh": 128,
+      "hk": 8,
+      "hv": 32,
+      "dk": 128,
+      "dv": 128,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "kv_sharing": {
+        "type": "cross_layer_gqa",
+        "group_size_full_layers": 2,
+        "full_attention_layers_1based": [
+          4,
+          8,
+          12,
+          16,
+          20,
+          24,
+          28,
+          32
+        ],
+        "source_layer_indices_1based": [
+          4,
+          12,
+          20,
+          28
+        ],
+        "source_by_full_layer_1based": {
+          "4": 4,
+          "8": 4,
+          "12": 12,
+          "16": 12,
+          "20": 20,
+          "24": 20,
+          "28": 28,
+          "32": 28
+        },
+        "source_builds_kv_from": "its own GR attention read",
+        "keys_and_values_shared": true,
+        "queries_output_gates_outputs": "independent per full layer",
+        "receiver_has_own_kv_projection": false,
+        "rope_head_dims_kv_dtype": "identical within each sharing group",
+        "persist_full_prefix": true,
+        "unshared_model_semantics_preserved": false,
+        "requires_training_and_recall_validation": true
+      },
+      "gdn_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 256,
+        "wrappers_per_layer": 2,
+        "final_read_only": true
+      },
+      "engram": {
+        "num_modules": 1,
+        "layer_indices_1based": [
+          2
+        ],
+        "ngram_orders": [
+          2,
+          3
+        ],
+        "hash_heads_per_order": 4,
+        "rows_per_order_head": {
+          "2": [
+            9765629,
+            9765643,
+            9765653,
+            9765661
+          ],
+          "3": [
+            9765671,
+            9765683,
+            9765751,
+            9765757
+          ]
+        },
+        "row_dim": 64,
+        "conv_kernel": 4,
+        "conv_dilation": 3,
+        "fusion": "branch-specific keys/gates and shared value before mixer"
+      },
+      "estimate": {
+        "neural_parts_parameters": {
+          "tied_embedding_head": 268435456,
+          "routed_experts": 18522046464,
+          "shared_experts": 289406976,
+          "routers": 4194304,
+          "gated_gqa": 104857600,
+          "gdn": 708383232,
+          "gated_residual": 275259392,
+          "engram_adapter": 5300224
+        },
+        "neural_parameters": 20177883648,
+        "ngram_table_parameters": 5000028672,
+        "total_parameters": 25177912320,
+        "active_parameters_convention": 2813465600,
+        "gqa_parameter_breakdown": {
+          "independent_queries_output_gates_and_outputs": 100663296,
+          "unique_source_keys_and_values": 4194304
+        },
+        "comparison_no_kv_sharing": {
+          "neural_parameters": 20182077952,
+          "active_parameters_convention": 2817659904,
+          "removed_duplicate_kv_projection_parameters": 4194304
+        },
+        "active_shared_and_nonexpert_parameters": 1655837184,
+        "active_routed_expert_parameters": 1157627904,
+        "table_touched_scalars_per_token": 512,
+        "bf16_neural_weights_GiB": 37.58423709869385,
+        "bf16_ngram_weights_GiB": 9.313279151916504,
+        "mixed_neural_weights_lower_GiB": 11.709237098693848,
+        "full_training_adam_neural_state_GiB": 300.6738967895508,
+        "full_training_adam_ngram_state_GiB": 74.50623321533203,
+        "full_training_adam_total_state_GiB": 375.1801300048828,
+        "cache_batch1_bf16": {
+          "32768": {
+            "kv_bytes": 134217728,
+            "kv_GiB": 0.125,
+            "unshared_hybrid_kv_GiB": 0.25,
+            "all_full_same_heads_kv_GiB": 1.0
+          },
+          "131072": {
+            "kv_bytes": 536870912,
+            "kv_GiB": 0.5,
+            "unshared_hybrid_kv_GiB": 1.0,
+            "all_full_same_heads_kv_GiB": 4.0
+          },
+          "262144": {
+            "kv_bytes": 1073741824,
+            "kv_GiB": 1.0,
+            "unshared_hybrid_kv_GiB": 2.0,
+            "all_full_same_heads_kv_GiB": 8.0
+          }
+        },
+        "fixed_decode_state": {
+          "gdn_recurrent_fp32_bytes": 50331648,
+          "gdn_conv_bf16_bytes": 884736,
+          "engram_conv_bf16_bytes": 147456,
+          "total_GiB": 0.0478363037109375
+        },
+        "one_live_gr_buffer_bf16_GiB": {
+          "8192": 0.125,
+          "32768": 0.5,
+          "262144": 4.0
+        },
+        "status": "analytical, excludes small service parameters; no trained model or measured VRAM"
+      }
+    },
+    {
+      "id": "nm-70b-e20b-gr",
+      "nominal_neural_parameters_B": 70,
+      "nominal_ngram_parameters_B": 20,
+      "L": 40,
+      "d": 2560,
+      "E": 256,
+      "k": 8,
+      "f": 832,
+      "V": 131072,
+      "shared_experts": 1,
+      "shared_expert_width": 832,
+      "tie_word_embeddings": true,
+      "hq": 20,
+      "hkv": 2,
+      "dh": 128,
+      "hk": 10,
+      "hv": 40,
+      "dk": 128,
+      "dv": 128,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "kv_sharing": {
+        "type": "cross_layer_gqa",
+        "group_size_full_layers": 2,
+        "full_attention_layers_1based": [
+          4,
+          8,
+          12,
+          16,
+          20,
+          24,
+          28,
+          32,
+          36,
+          40
+        ],
+        "source_layer_indices_1based": [
+          4,
+          12,
+          20,
+          28,
+          36
+        ],
+        "source_by_full_layer_1based": {
+          "4": 4,
+          "8": 4,
+          "12": 12,
+          "16": 12,
+          "20": 20,
+          "24": 20,
+          "28": 28,
+          "32": 28,
+          "36": 36,
+          "40": 36
+        },
+        "source_builds_kv_from": "its own GR attention read",
+        "keys_and_values_shared": true,
+        "queries_output_gates_outputs": "independent per full layer",
+        "receiver_has_own_kv_projection": false,
+        "rope_head_dims_kv_dtype": "identical within each sharing group",
+        "persist_full_prefix": true,
+        "unshared_model_semantics_preserved": false,
+        "requires_training_and_recall_validation": true
+      },
+      "gdn_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 320,
+        "wrappers_per_layer": 2,
+        "final_read_only": true
+      },
+      "engram": {
+        "num_modules": 1,
+        "layer_indices_1based": [
+          2
+        ],
+        "ngram_orders": [
+          2,
+          3
+        ],
+        "hash_heads_per_order": 4,
+        "rows_per_order_head": {
+          "2": [
+            19531261,
+            19531289,
+            19531327,
+            19531339
+          ],
+          "3": [
+            19531381,
+            19531387,
+            19531403,
+            19531409
+          ]
+        },
+        "row_dim": 128,
+        "conv_kernel": 4,
+        "conv_dilation": 3,
+        "fusion": "branch-specific keys/gates and shared value before mixer"
+      },
+      "estimate": {
+        "neural_parts_parameters": {
+          "tied_embedding_head": 335544320,
+          "routed_experts": 65431142400,
+          "shared_experts": 255590400,
+          "routers": 26214400,
+          "gated_gqa": 203161600,
+          "gdn": 1383327840,
+          "gated_residual": 534947840,
+          "engram_adapter": 13178880
+        },
+        "neural_parameters": 68183107680,
+        "ngram_table_parameters": 20000101888,
+        "total_parameters": 88183209568,
+        "active_parameters_convention": 4796689504,
+        "gqa_parameter_breakdown": {
+          "independent_queries_output_gates_and_outputs": 196608000,
+          "unique_source_keys_and_values": 6553600
+        },
+        "comparison_no_kv_sharing": {
+          "neural_parameters": 68189661280,
+          "active_parameters_convention": 4803243104,
+          "removed_duplicate_kv_projection_parameters": 6553600
+        },
+        "active_shared_and_nonexpert_parameters": 2751965280,
+        "active_routed_expert_parameters": 2044723200,
+        "table_touched_scalars_per_token": 1024,
+        "bf16_neural_weights_GiB": 127.00093477964401,
+        "bf16_ngram_weights_GiB": 37.253092765808105,
+        "mixed_neural_weights_lower_GiB": 35.59468477964401,
+        "full_training_adam_neural_state_GiB": 1016.0074782371521,
+        "full_training_adam_ngram_state_GiB": 298.02474212646484,
+        "full_training_adam_total_state_GiB": 1314.032220363617,
+        "cache_batch1_bf16": {
+          "32768": {
+            "kv_bytes": 167772160,
+            "kv_GiB": 0.15625,
+            "unshared_hybrid_kv_GiB": 0.3125,
+            "all_full_same_heads_kv_GiB": 1.25
+          },
+          "131072": {
+            "kv_bytes": 671088640,
+            "kv_GiB": 0.625,
+            "unshared_hybrid_kv_GiB": 1.25,
+            "all_full_same_heads_kv_GiB": 5.0
+          },
+          "262144": {
+            "kv_bytes": 1342177280,
+            "kv_GiB": 1.25,
+            "unshared_hybrid_kv_GiB": 2.5,
+            "all_full_same_heads_kv_GiB": 10.0
+          }
+        },
+        "fixed_decode_state": {
+          "gdn_recurrent_fp32_bytes": 78643200,
+          "gdn_conv_bf16_bytes": 1382400,
+          "engram_conv_bf16_bytes": 184320,
+          "total_GiB": 0.07470130920410156
+        },
+        "one_live_gr_buffer_bf16_GiB": {
+          "8192": 0.15625,
+          "32768": 0.625,
+          "262144": 5.0
+        },
+        "status": "analytical, excludes small service parameters; no trained model or measured VRAM"
+      }
+    },
+    {
+      "id": "nm-125b-e50b-gr",
+      "nominal_neural_parameters_B": 125,
+      "nominal_ngram_parameters_B": 50,
+      "L": 48,
+      "d": 2560,
+      "E": 512,
+      "k": 10,
+      "f": 640,
+      "V": 131072,
+      "shared_experts": 1,
+      "shared_expert_width": 640,
+      "tie_word_embeddings": true,
+      "hq": 20,
+      "hkv": 2,
+      "dh": 128,
+      "hk": 10,
+      "hv": 40,
+      "dk": 128,
+      "dv": 128,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "kv_sharing": {
+        "type": "cross_layer_gqa",
+        "group_size_full_layers": 2,
+        "full_attention_layers_1based": [
+          4,
+          8,
+          12,
+          16,
+          20,
+          24,
+          28,
+          32,
+          36,
+          40,
+          44,
+          48
+        ],
+        "source_layer_indices_1based": [
+          4,
+          12,
+          20,
+          28,
+          36,
+          44
+        ],
+        "source_by_full_layer_1based": {
+          "4": 4,
+          "8": 4,
+          "12": 12,
+          "16": 12,
+          "20": 20,
+          "24": 20,
+          "28": 28,
+          "32": 28,
+          "36": 36,
+          "40": 36,
+          "44": 44,
+          "48": 44
+        },
+        "source_builds_kv_from": "its own GR attention read",
+        "keys_and_values_shared": true,
+        "queries_output_gates_outputs": "independent per full layer",
+        "receiver_has_own_kv_projection": false,
+        "rope_head_dims_kv_dtype": "identical within each sharing group",
+        "persist_full_prefix": true,
+        "unshared_model_semantics_preserved": false,
+        "requires_training_and_recall_validation": true
+      },
+      "gdn_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 320,
+        "wrappers_per_layer": 2,
+        "final_read_only": true
+      },
+      "engram": {
+        "num_modules": 1,
+        "layer_indices_1based": [
+          2
+        ],
+        "ngram_orders": [
+          2,
+          3
+        ],
+        "hash_heads_per_order": 4,
+        "rows_per_order_head": {
+          "2": [
+            48828139,
+            48828163,
+            48828173,
+            48828181
+          ],
+          "3": [
+            48828187,
+            48828203,
+            48828209,
+            48828217
+          ]
+        },
+        "row_dim": 128,
+        "conv_kernel": 4,
+        "conv_dilation": 3,
+        "fusion": "branch-specific keys/gates and shared value before mixer"
+      },
+      "estimate": {
+        "neural_parts_parameters": {
+          "tied_embedding_head": 335544320,
+          "routed_experts": 120795955200,
+          "shared_experts": 235929600,
+          "routers": 62914560,
+          "gated_gqa": 243793920,
+          "gdn": 1659993408,
+          "gated_residual": 640624640,
+          "engram_adapter": 13178880
+        },
+        "neural_parameters": 123987934528,
+        "ngram_table_parameters": 50000060416,
+        "total_parameters": 173987994944,
+        "active_parameters_convention": 5551276352,
+        "gqa_parameter_breakdown": {
+          "independent_queries_output_gates_and_outputs": 235929600,
+          "unique_source_keys_and_values": 7864320
+        },
+        "comparison_no_kv_sharing": {
+          "neural_parameters": 123995798848,
+          "active_parameters_convention": 5559140672,
+          "removed_duplicate_kv_projection_parameters": 7864320
+        },
+        "active_shared_and_nonexpert_parameters": 3191979328,
+        "active_routed_expert_parameters": 2359296000,
+        "table_touched_scalars_per_token": 1024,
+        "bf16_neural_weights_GiB": 230.9455248117447,
+        "bf16_ngram_weights_GiB": 93.13236999511719,
+        "mixed_neural_weights_lower_GiB": 62.19552481174469,
+        "full_training_adam_neural_state_GiB": 1847.5641984939575,
+        "full_training_adam_ngram_state_GiB": 745.0589599609375,
+        "full_training_adam_total_state_GiB": 2592.623158454895,
+        "cache_batch1_bf16": {
+          "32768": {
+            "kv_bytes": 201326592,
+            "kv_GiB": 0.1875,
+            "unshared_hybrid_kv_GiB": 0.375,
+            "all_full_same_heads_kv_GiB": 1.5
+          },
+          "131072": {
+            "kv_bytes": 805306368,
+            "kv_GiB": 0.75,
+            "unshared_hybrid_kv_GiB": 1.5,
+            "all_full_same_heads_kv_GiB": 6.0
+          },
+          "262144": {
+            "kv_bytes": 1610612736,
+            "kv_GiB": 1.5,
+            "unshared_hybrid_kv_GiB": 3.0,
+            "all_full_same_heads_kv_GiB": 12.0
+          }
+        },
+        "fixed_decode_state": {
+          "gdn_recurrent_fp32_bytes": 94371840,
+          "gdn_conv_bf16_bytes": 1658880,
+          "engram_conv_bf16_bytes": 184320,
+          "total_GiB": 0.08960723876953125
+        },
+        "one_live_gr_buffer_bf16_GiB": {
+          "8192": 0.15625,
+          "32768": 0.625,
+          "262144": 5.0
+        },
+        "status": "analytical, excludes small service parameters; no trained model or measured VRAM"
+      }
+    },
+    {
+      "id": "nm-400b-e100b-gr",
+      "nominal_neural_parameters_B": 400,
+      "nominal_ngram_parameters_B": 100,
+      "L": 60,
+      "d": 4096,
+      "E": 512,
+      "k": 10,
+      "f": 1024,
+      "V": 131072,
+      "shared_experts": 1,
+      "shared_expert_width": 1024,
+      "tie_word_embeddings": true,
+      "hq": 32,
+      "hkv": 4,
+      "dh": 128,
+      "hk": 16,
+      "hv": 64,
+      "dk": 128,
+      "dv": 128,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "kv_sharing": {
+        "type": "cross_layer_gqa",
+        "group_size_full_layers": 2,
+        "full_attention_layers_1based": [
+          4,
+          8,
+          12,
+          16,
+          20,
+          24,
+          28,
+          32,
+          36,
+          40,
+          44,
+          48,
+          52,
+          56,
+          60
+        ],
+        "source_layer_indices_1based": [
+          4,
+          12,
+          20,
+          28,
+          36,
+          44,
+          52,
+          60
+        ],
+        "source_by_full_layer_1based": {
+          "4": 4,
+          "8": 4,
+          "12": 12,
+          "16": 12,
+          "20": 20,
+          "24": 20,
+          "28": 28,
+          "32": 28,
+          "36": 36,
+          "40": 36,
+          "44": 44,
+          "48": 44,
+          "52": 52,
+          "56": 52,
+          "60": 60
+        },
+        "source_builds_kv_from": "its own GR attention read",
+        "keys_and_values_shared": true,
+        "queries_output_gates_outputs": "independent per full layer",
+        "receiver_has_own_kv_projection": false,
+        "rope_head_dims_kv_dtype": "identical within each sharing group",
+        "persist_full_prefix": true,
+        "unshared_model_semantics_preserved": false,
+        "requires_training_and_recall_validation": true
+      },
+      "gdn_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 512,
+        "wrappers_per_layer": 2,
+        "final_read_only": true
+      },
+      "engram": {
+        "num_modules": 1,
+        "layer_indices_1based": [
+          2
+        ],
+        "ngram_orders": [
+          2,
+          3
+        ],
+        "hash_heads_per_order": 4,
+        "rows_per_order_head": {
+          "2": [
+            97656277,
+            97656289,
+            97656329,
+            97656331
+          ],
+          "3": [
+            97656337,
+            97656341,
+            97656353,
+            97656359
+          ]
+        },
+        "row_dim": 128,
+        "conv_kernel": 4,
+        "conv_dilation": 3,
+        "fusion": "branch-specific keys/gates and shared value before mixer"
+      },
+      "estimate": {
+        "neural_parts_parameters": {
+          "tied_embedding_head": 536870912,
+          "routed_experts": 386547056640,
+          "shared_experts": 754974720,
+          "routers": 125829120,
+          "gated_gqa": 788529152,
+          "gdn": 5310639360,
+          "gated_residual": 2039889920,
+          "engram_adapter": 21086208
+        },
+        "neural_parameters": 396124876032,
+        "ngram_table_parameters": 100000078848,
+        "total_parameters": 496124954880,
+        "active_parameters_convention": 17127567616,
+        "gqa_parameter_breakdown": {
+          "independent_queries_output_gates_and_outputs": 754974720,
+          "unique_source_keys_and_values": 33554432
+        },
+        "comparison_no_kv_sharing": {
+          "neural_parameters": 396154236160,
+          "active_parameters_convention": 17156927744,
+          "removed_duplicate_kv_projection_parameters": 29360128
+        },
+        "active_shared_and_nonexpert_parameters": 9577819392,
+        "active_routed_expert_parameters": 7549747200,
+        "table_touched_scalars_per_token": 1024,
+        "bf16_neural_weights_GiB": 737.840078830719,
+        "bf16_ngram_weights_GiB": 186.26466178894043,
+        "mixed_neural_weights_lower_GiB": 197.840078830719,
+        "full_training_adam_neural_state_GiB": 5902.720630645752,
+        "full_training_adam_ngram_state_GiB": 1490.1172943115234,
+        "full_training_adam_total_state_GiB": 7392.837924957275,
+        "cache_batch1_bf16": {
+          "32768": {
+            "kv_bytes": 536870912,
+            "kv_GiB": 0.5,
+            "unshared_hybrid_kv_GiB": 0.9375,
+            "all_full_same_heads_kv_GiB": 3.75
+          },
+          "131072": {
+            "kv_bytes": 2147483648,
+            "kv_GiB": 2.0,
+            "unshared_hybrid_kv_GiB": 3.75,
+            "all_full_same_heads_kv_GiB": 15.0
+          },
+          "262144": {
+            "kv_bytes": 4294967296,
+            "kv_GiB": 4.0,
+            "unshared_hybrid_kv_GiB": 7.5,
+            "all_full_same_heads_kv_GiB": 30.0
+          }
+        },
+        "fixed_decode_state": {
+          "gdn_recurrent_fp32_bytes": 188743680,
+          "gdn_conv_bf16_bytes": 3317760,
+          "engram_conv_bf16_bytes": 294912,
+          "total_GiB": 0.17914581298828125
+        },
+        "one_live_gr_buffer_bf16_GiB": {
+          "8192": 0.25,
+          "32768": 1.0,
+          "262144": 8.0
+        },
+        "status": "analytical, excludes small service parameters; no trained model or measured VRAM"
+      }
+    },
+    {
+      "id": "nm-1000b-e200b-gr",
+      "nominal_neural_parameters_B": 1000,
+      "nominal_ngram_parameters_B": 200,
+      "L": 72,
+      "d": 5120,
+      "E": 768,
+      "k": 12,
+      "f": 1152,
+      "V": 131072,
+      "shared_experts": 1,
+      "shared_expert_width": 1152,
+      "tie_word_embeddings": true,
+      "hq": 40,
+      "hkv": 4,
+      "dh": 128,
+      "hk": 20,
+      "hv": 80,
+      "dk": 128,
+      "dv": 128,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "kv_sharing": {
+        "type": "cross_layer_gqa",
+        "group_size_full_layers": 2,
+        "full_attention_layers_1based": [
+          4,
+          8,
+          12,
+          16,
+          20,
+          24,
+          28,
+          32,
+          36,
+          40,
+          44,
+          48,
+          52,
+          56,
+          60,
+          64,
+          68,
+          72
+        ],
+        "source_layer_indices_1based": [
+          4,
+          12,
+          20,
+          28,
+          36,
+          44,
+          52,
+          60,
+          68
+        ],
+        "source_by_full_layer_1based": {
+          "4": 4,
+          "8": 4,
+          "12": 12,
+          "16": 12,
+          "20": 20,
+          "24": 20,
+          "28": 28,
+          "32": 28,
+          "36": 36,
+          "40": 36,
+          "44": 44,
+          "48": 44,
+          "52": 52,
+          "56": 52,
+          "60": 60,
+          "64": 60,
+          "68": 68,
+          "72": 68
+        },
+        "source_builds_kv_from": "its own GR attention read",
+        "keys_and_values_shared": true,
+        "queries_output_gates_outputs": "independent per full layer",
+        "receiver_has_own_kv_projection": false,
+        "rope_head_dims_kv_dtype": "identical within each sharing group",
+        "persist_full_prefix": true,
+        "unshared_model_semantics_preserved": false,
+        "requires_training_and_recall_validation": true
+      },
+      "gdn_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 640,
+        "wrappers_per_layer": 2,
+        "final_read_only": true
+      },
+      "engram": {
+        "num_modules": 1,
+        "layer_indices_1based": [
+          2
+        ],
+        "ngram_orders": [
+          2,
+          3
+        ],
+        "hash_heads_per_order": 4,
+        "rows_per_order_head": {
+          "2": [
+            195312503,
+            195312511,
+            195312521,
+            195312563
+          ],
+          "3": [
+            195312577,
+            195312581,
+            195312587,
+            195312613
+          ]
+        },
+        "row_dim": 128,
+        "conv_kernel": 4,
+        "conv_dilation": 3,
+        "fusion": "branch-specific keys/gates and shared value before mixer"
+      },
+      "estimate": {
+        "neural_parts_parameters": {
+          "tied_embedding_head": 671088640,
+          "routed_experts": 978447237120,
+          "shared_experts": 1274019840,
+          "routers": 283115520,
+          "gated_gqa": 1462763520,
+          "gdn": 9956613312,
+          "gated_residual": 3815854080,
+          "engram_adapter": 26357760
+        },
+        "neural_parameters": 995937049792,
+        "ngram_table_parameters": 200000058368,
+        "total_parameters": 1195937108160,
+        "active_parameters_convention": 32778051776,
+        "gqa_parameter_breakdown": {
+          "independent_queries_output_gates_and_outputs": 1415577600,
+          "unique_source_keys_and_values": 47185920
+        },
+        "comparison_no_kv_sharing": {
+          "neural_parameters": 995984235712,
+          "active_parameters_convention": 32825237696,
+          "removed_duplicate_kv_projection_parameters": 47185920
+        },
+        "active_shared_and_nonexpert_parameters": 17489812672,
+        "active_routed_expert_parameters": 15288238080,
+        "table_touched_scalars_per_token": 1024,
+        "bf16_neural_weights_GiB": 1855.077314734459,
+        "bf16_ngram_weights_GiB": 372.5291385650635,
+        "mixed_neural_weights_lower_GiB": 488.2023147344589,
+        "full_training_adam_neural_state_GiB": 14840.618517875671,
+        "full_training_adam_ngram_state_GiB": 2980.233108520508,
+        "full_training_adam_total_state_GiB": 17820.85162639618,
+        "cache_batch1_bf16": {
+          "32768": {
+            "kv_bytes": 603979776,
+            "kv_GiB": 0.5625,
+            "unshared_hybrid_kv_GiB": 1.125,
+            "all_full_same_heads_kv_GiB": 4.5
+          },
+          "131072": {
+            "kv_bytes": 2415919104,
+            "kv_GiB": 2.25,
+            "unshared_hybrid_kv_GiB": 4.5,
+            "all_full_same_heads_kv_GiB": 18.0
+          },
+          "262144": {
+            "kv_bytes": 4831838208,
+            "kv_GiB": 4.5,
+            "unshared_hybrid_kv_GiB": 9.0,
+            "all_full_same_heads_kv_GiB": 36.0
+          }
+        },
+        "fixed_decode_state": {
+          "gdn_recurrent_fp32_bytes": 283115520,
+          "gdn_conv_bf16_bytes": 4976640,
+          "engram_conv_bf16_bytes": 368640,
+          "total_GiB": 0.2686500549316406
+        },
+        "one_live_gr_buffer_bf16_GiB": {
+          "8192": 0.3125,
+          "32768": 1.25,
+          "262144": 10.0
+        },
+        "status": "analytical, excludes small service parameters; no trained model or measured VRAM"
+      }
+    }
+  ]
+}
