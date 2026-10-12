@@ -1,0 +1,6 @@
+# Keep Colab's preinstalled CUDA torch >=2.6; do not replace it with a CPU wheel.
+tokenizers==0.21.4
+datasets==3.6.0
+matplotlib>=3.8,<4
+# Optional CUDA optimizer, installed by notebook only when requested:
+# bitsandbytes==0.45.5

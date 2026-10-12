@@ -1,0 +1,317 @@
+{
+  "schema_version": "0.2-draft",
+  "purpose": "Earlier two-module illustrative calculations; current ten-profile baseline family is in model-family.json; final size and hardware undecided",
+  "requirements": {
+    "languages": [
+      "uk",
+      "en"
+    ],
+    "target_context_tokens": 262144,
+    "context_stages_tokens": [
+      32768,
+      131072,
+      262144
+    ],
+    "attention": "GDN plus rare full GQA layers",
+    "edit_mode": "Direct add/replace/delete of Engram vectors",
+    "baseline_engram_modules": 1,
+    "illustrative_profiles_engram_modules": 2,
+    "cache_growth_with_context": "allowed and expected; retain full causal KV prefix in global layers",
+    "bounded_total_cache_required": false,
+    "ngram_placement_decision": {
+      "baseline": "one early module on decoder block 2 (1-based)",
+      "second_module": "research option; requires trained matched-budget comparison",
+      "review": "docs/ngram-placement-review.md"
+    },
+    "residual": {
+      "type": "Gated Residual from Flash-Next",
+      "branches": 4,
+      "rank_default": "d/8",
+      "separate_attention_and_moe_operators": true,
+      "final_read_only": true,
+      "engram_fusion": "branch-specific keys/gates, shared value; before mixer on memory layers"
+    }
+  },
+  "units": {
+    "parameter_counts": "scalars; decimal B/M",
+    "memory": "GiB (2^30 bytes)"
+  },
+  "assumptions": {
+    "shared_expert_width": "f",
+    "expert_activation": "SwiGLU",
+    "gqa_output_gate": "per channel, separate projection",
+    "gdn_state_dtype": "float32",
+    "kv_dtype": "bfloat16",
+    "routed_weight_quantization_bits": 4,
+    "other_neural_weight_bits": 16,
+    "table_weight_bits": 16,
+    "adam_state_bytes_per_parameter": 16,
+    "batch_for_cache": 1,
+    "exclusions": [
+      "remaining small GDN/GQA norms and other service parameters",
+      "quantization metadata/padding/scales",
+      "GPU table cache and mutable entries",
+      "other activation/workspace/communication/allocator memory"
+    ],
+    "initial_baseline": "single Engram module on layer 2; two-module illustrative profiles are comparison scenarios",
+    "residual_dtype": "bfloat16",
+    "residual_initialization": "repeat token embedding into independent accumulators",
+    "residual_normalization": "per branch, replaces old sublayer pre-norm; final read-only GR replaces old final norm",
+    "engram_adapter": "shared value, branch-specific keys and gates, dilated depthwise conv, query/key/conv group norms"
+  },
+  "profiles": [
+    {
+      "id": "illustrative-248m-gr",
+      "d": 512,
+      "L": 12,
+      "E": 16,
+      "k": 2,
+      "f": 512,
+      "V": 65536,
+      "hq": 8,
+      "hkv": 2,
+      "dh": 64,
+      "hk": 4,
+      "hv": 8,
+      "dk": 64,
+      "dv": 64,
+      "rows": 65536,
+      "hash_heads": 4,
+      "row_dim": 32,
+      "estimate": {
+        "parts": {
+          "embedding": 33554432,
+          "routed": 150994944,
+          "shared": 9437184,
+          "routers": 98304,
+          "full_attention": 2752512,
+          "linear_attention": 9548496,
+          "engram_projection": 1339392,
+          "engram_table": 33554432,
+          "gated_residual": 6801408
+        },
+        "total": 248081104,
+        "neural": 214526672,
+        "active_convention": 82406608,
+        "table_touched_scalars_per_token": 512,
+        "bf16_neural_GiB": 0.39958706498146057,
+        "mixed_quant_neural_lower_GiB": 0.18864956498146057,
+        "bf16_table_GiB": 0.0625,
+        "adam_state_total_GiB": 3.6966965198516846,
+        "adam_state_neural_GiB": 3.1966965198516846,
+        "cache": {
+          "8192": {
+            "KV_GiB": 0.01171875,
+            "recurrent_GiB": 0.0010986328125,
+            "conv_GiB": 5.14984130859375e-05,
+            "all_full_KV_GiB": 0.046875,
+            "engram_conv_GiB": 6.866455078125e-05
+          },
+          "32768": {
+            "KV_GiB": 0.046875,
+            "recurrent_GiB": 0.0010986328125,
+            "conv_GiB": 5.14984130859375e-05,
+            "all_full_KV_GiB": 0.1875,
+            "engram_conv_GiB": 6.866455078125e-05
+          },
+          "131072": {
+            "KV_GiB": 0.1875,
+            "recurrent_GiB": 0.0010986328125,
+            "conv_GiB": 5.14984130859375e-05,
+            "all_full_KV_GiB": 0.75,
+            "engram_conv_GiB": 6.866455078125e-05
+          },
+          "262144": {
+            "KV_GiB": 0.375,
+            "recurrent_GiB": 0.0010986328125,
+            "conv_GiB": 5.14984130859375e-05,
+            "all_full_KV_GiB": 1.5,
+            "engram_conv_GiB": 6.866455078125e-05
+          }
+        },
+        "status": "analytical; no model implementation or measurements",
+        "live_residual_GiB_by_chunk_tokens": {
+          "8192": 0.03125,
+          "32768": 0.125,
+          "131072": 0.5,
+          "262144": 1.0
+        }
+      },
+      "engram_layer_indices_1based": [
+        2,
+        6
+      ],
+      "ngram_orders": [
+        2,
+        3
+      ],
+      "engram_num_modules": 2,
+      "shared_experts": 1,
+      "tie_word_embeddings": true,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "gdn_conv_kernel": 4,
+      "engram_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 64,
+        "wrappers_per_layer": 2,
+        "final_read_only": true,
+        "wrapper_parameters": 272384,
+        "final_read_parameters": 264192
+      },
+      "engram_conv_dilation": 3,
+      "engram_position": "before mixer on configured memory layers"
+    },
+    {
+      "id": "illustrative-21b-gr",
+      "d": 2048,
+      "L": 32,
+      "E": 64,
+      "k": 4,
+      "f": 1536,
+      "V": 131072,
+      "hq": 16,
+      "hkv": 4,
+      "dh": 128,
+      "hk": 8,
+      "hv": 16,
+      "dk": 128,
+      "dv": 128,
+      "rows": 1048576,
+      "hash_heads": 4,
+      "row_dim": 64,
+      "estimate": {
+        "parts": {
+          "embedding": 268435456,
+          "routed": 19327352832,
+          "shared": 301989888,
+          "routers": 4194304,
+          "full_attention": 117440512,
+          "linear_attention": 404623104,
+          "engram_projection": 10600448,
+          "engram_table": 1073741824,
+          "gated_residual": 275259392
+        },
+        "total": 21783637760,
+        "neural": 20709895936,
+        "active_convention": 2590503680,
+        "table_touched_scalars_per_token": 1024,
+        "bf16_neural_GiB": 38.57518720626831,
+        "mixed_quant_neural_lower_GiB": 11.57518720626831,
+        "bf16_table_GiB": 2.0,
+        "adam_state_total_GiB": 324.6014976501465,
+        "adam_state_neural_GiB": 308.6014976501465,
+        "cache": {
+          "8192": {
+            "KV_GiB": 0.125,
+            "recurrent_GiB": 0.0234375,
+            "conv_GiB": 0.00054931640625,
+            "all_full_KV_GiB": 0.5,
+            "engram_conv_GiB": 0.000274658203125
+          },
+          "32768": {
+            "KV_GiB": 0.5,
+            "recurrent_GiB": 0.0234375,
+            "conv_GiB": 0.00054931640625,
+            "all_full_KV_GiB": 2.0,
+            "engram_conv_GiB": 0.000274658203125
+          },
+          "131072": {
+            "KV_GiB": 2.0,
+            "recurrent_GiB": 0.0234375,
+            "conv_GiB": 0.00054931640625,
+            "all_full_KV_GiB": 8.0,
+            "engram_conv_GiB": 0.000274658203125
+          },
+          "262144": {
+            "KV_GiB": 4.0,
+            "recurrent_GiB": 0.0234375,
+            "conv_GiB": 0.00054931640625,
+            "all_full_KV_GiB": 16.0,
+            "engram_conv_GiB": 0.000274658203125
+          }
+        },
+        "status": "analytical; no model implementation or measurements",
+        "live_residual_GiB_by_chunk_tokens": {
+          "8192": 0.125,
+          "32768": 0.5,
+          "131072": 2.0,
+          "262144": 4.0
+        }
+      },
+      "engram_layer_indices_1based": [
+        2,
+        16
+      ],
+      "ngram_orders": [
+        2,
+        3
+      ],
+      "engram_num_modules": 2,
+      "shared_experts": 1,
+      "tie_word_embeddings": true,
+      "attention_schedule": [
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa",
+        "gdn",
+        "gdn",
+        "gdn",
+        "gated_gqa"
+      ],
+      "gdn_conv_kernel": 4,
+      "engram_conv_kernel": 4,
+      "residual": {
+        "type": "gated_residual",
+        "branches": 4,
+        "rank": 256,
+        "wrappers_per_layer": 2,
+        "final_read_only": true,
+        "wrapper_parameters": 4235264,
+        "final_read_parameters": 4202496
+      },
+      "engram_conv_dilation": 3,
+      "engram_position": "before mixer on configured memory layers"
+    }
+  ],
+  "architecture_version": "0.2-legacy-unshared-kv"
+}
