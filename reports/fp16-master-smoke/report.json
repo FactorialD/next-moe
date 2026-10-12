@@ -1,0 +1,20 @@
+{
+  "device": "cpu",
+  "steps": 2,
+  "parameters": 293688272,
+  "precision": "fp16_master",
+  "model_dtype": "torch.float16",
+  "optimizer_parameter_dtype": "torch.float32",
+  "metrics": {
+    "val_ce_uk": 10.946513175964355,
+    "val_ppl_uk": 56755.80245184317,
+    "val_ce_en": 11.105199813842773,
+    "val_ppl_en": 66516.13400559455
+  },
+  "elapsed_seconds": 38.19795875798445,
+  "weights_snapshot_GiB": 0.5473337201401591,
+  "full_checkpoint_GiB": 3.809910850599408,
+  "scope": "CPU mechanical check on synthetic local UK/EN; not GPU or Wikipedia quality",
+  "processed_training_tokens": 64,
+  "torch_version": "2.6.0+cpu"
+}

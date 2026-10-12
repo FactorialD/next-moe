@@ -200,7 +200,7 @@ class GDN(nn.Module):
         k = k.reshape(b, t, c.gdn_k_heads, c.gdn_key_dim).repeat_interleave(repeat, dim=2).transpose(1, 2)
         q, k = F.normalize(q.float(), dim=-1, eps=1e-6), F.normalize(k.float(), dim=-1, eps=1e-6)
         v = v.reshape(b, t, c.gdn_v_heads, c.gdn_value_dim).transpose(1, 2)
-        log_alpha = -F.softplus(self.decay(x).float() + self.dt_bias) * self.A_log.exp()
+        log_alpha = -F.softplus(self.decay(x).float() + self.dt_bias.float()) * self.A_log.float().exp()
         log_alpha = log_alpha.transpose(1, 2)
         beta = self.beta(x).float().sigmoid().transpose(1, 2)
         state = torch.zeros(b, c.gdn_v_heads, c.gdn_key_dim, c.gdn_value_dim, device=x.device)

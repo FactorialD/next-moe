@@ -1,56 +1,71 @@
-# Тестовое обучение 0.2B + 0.1B Engram в Colab
+# Обучение 0.2B + 0.1B Engram в Colab: workflow v2
 
-## Открытие и запуск
+После [пользовательского T4 run на 300 updates](colab-results-and-next-steps.md) notebook обновлён для ограниченного Drive, FP16 model parameters и более длинного token budget. Состав модели v0.3 не менялся.
 
-1. Скачайте [next_moe_0p2b_engram_0p1b.ipynb](../notebooks/next_moe_0p2b_engram_0p1b.ipynb).
-2. Откройте [Google Colab](https://colab.research.google.com/), выберите **File → Upload notebook** и загрузите файл.
-3. Выберите **Runtime → Change runtime type → GPU** и выполняйте ячейки сверху вниз.
-4. Оставьте `PROFILE='full'`, `SEQ_LEN=128`, `MICROBATCH=1`, `GRAD_ACCUM=4`, `STEPS=300` для первого эксперимента.
-5. По умолчанию подключается ваш Google Drive: код сохраняет результаты в `MyDrive/next-moe/<RUN_NAME>`. Для временного хранения задайте `USE_DRIVE=False`; файлы `/content` исчезнут при отключении runtime.
+## Открытие
 
-Ноутбук самостоятельный: четыре Python-модуля встроены в ячейку и записываются в `/content/next-moe-code`. Он не зависит от доступности текущей ветки GitHub. Исходники и SHA256 каждого файла сохраняются с результатами. При изменении реализации пересоберите notebook командой `python scripts/build_colab.py`. Публикация или commit не выполнялись.
+[Открыть в Colab](https://colab.research.google.com/github/FactorialD/next-moe/blob/work/notebooks/next_moe_0p2b_engram_0p1b.ipynb), включить **Runtime → Change runtime type → GPU**, выполнять ячейки сверху вниз. Notebook содержит пять Python-модулей; клонировать repo не требуется. Источники и SHA256 сохраняются в run. Для пересборки после изменения Python-модулей: `python scripts/build_colab.py`.
 
-## Что обучается
+## Первый запуск обновлённого режима
 
-Это реализация текущей архитектуры v0.3 для самого маленького профиля: 12 слоёв шириной 512, 16 routed experts / top-2 плюс один shared в каждом слое, четыре GR-потока, один Engram на втором decoder block. GDN/full GQA = 3:1; global слои 4/8 используют K/V source 4, слой 12 — собственный source. Reader имеет свои Q/gate/output и получает градиент через source K/V.
+1. Оставить `PROFILE='full'`, context128, microbatch1, accumulation4, optimizer AdamW. `PRECISION='auto_master'` выбирает **FP16 модель + FP32 masters на T4**, BF16 модель на поддерживающих GPU и FP32 в CPU tiny tests.
+2. Сначала поставить **`SESSION_UPDATES=20` или 50**. Новый CUDA FP16-master режим ещё не измерен на T4, даже если старый FP32+autocast notebook работал. Проверить конечность loss/gradients, GradScaler retries, memory и save/load.
+3. Затем оставить `TOTAL_TOKENS=10_000_000`, увеличить session limit до 1000, повторить training cell. Внутри живого runtime сохраняется optimizer; не требуется пересоздавать модель при каждом session limit.
+4. Около 1M cumulative tokens проверить validation, generation, накопленный routing и corpus sampling passes. 10M — исследовательская цель, не обещание chat quality/полноценного pretraining. По прежнему времени это ~27.25 h с нуля без ускорения.
 
-Фактический размер реализации: **193 672 208 neural + 100 016 064 table = 293 688 272 параметра**. Разница с аналитическим профилем — 320 небольших Q/K RMSNorm gains, исключённых из старой оценки. Сохраняются 65 536 embedding/head rows, даже если tokenizer на небольшом корпусе выучил меньше BPE tokens. Embedding и LM head связаны.
+Total tokens включают прошлый checkpoint. Steps вычисляются из remaining tokens и текущего effective batch, LR рассчитан на весь план. Например, продолжение с step300/tokens153600 при batch512 до10M заканчивается около step19532. Session boundary не охлаждает LR до минимума.
 
-Resident weights и gradients FP32; autocast выполняет часть вычислений в FP16 на T4 или BF16 на поддерживаемых GPU. GDN recurrence и router scores считаются FP32. Standard AdamW хранит около 16 bytes/parameter после lazy allocation states: приблизительно 4.38 GiB без активаций и workspace. В отличие от альтернативного BF16 + FP32 master accounting, здесь 4 bytes weights + 4 gradients + 8 moments дают ту же сумму. Optional AdamW8bit — приблизительно 10 bytes/parameter плюс metadata и small FP32 tensors; CUDA/пакет надо проверить на конкретном Colab runtime.
+## Продолжить предыдущую тренировку
 
-В обоих режимах GQA использует PyTorch SDPA; backend автоматически выбирается для GPU/dtype, наличие именно FlashAttention не гарантируется. Block checkpointing и chunked/checkpointed LM loss включены. GDN реализован через точное chunkwise triangular solve, MoE — простой no-drop dispatch. Это проверяемый PyTorch reference, без production Triton GDN или fused MoE. Не предполагается конкретная скорость T4 и не гарантируется peak VRAM до измерения.
+По умолчанию новый run называется `next-moe-0p2b-engram0p1b-10m-v2`. Если в `MyDrive/next-moe/next-moe-0p2b-engram0p1b-test-v1` есть старый `last.pt`, notebook выбирает **warm start** из него и использует старые tokenizer/metadata при расширении корпуса. Веса и progress переносятся, optimizer/RNG создаются заново; есть 100-update LR ramp. Это намеренная новая фаза с иной precision/данными/schedule, не exact продолжение первого run.
 
-При CUDA OOM уменьшите последовательность до 64/32 и создайте новый run; microbatch оставьте 1, checkpointing включённым. Менять форму запуска при strict resume нельзя. Объём effective batch: `microbatch × sequence_length × accumulation` tokens на optimizer update.
+Для другого расположения указать `INIT_CHECKPOINT`, `INIT_TOKENIZER`, `INIT_METADATA`. Старый inference-only `model.pt` не содержит step/tokens; автоматический импорт его не угадывает. Использовать старый full `last.pt` либо новый `weights.pt`. Старые файлы не удаляются.
 
-## Корпус
+`RESUME_MODE='auto'` для текущего v2 run:
 
-Используется готовый открытый датасет, а не ручной scraping статей. Точный источник, версия, объёмы, split и правила обработки описаны в [training-corpus.md](training-corpus.md). По умолчанию 2000 отобранных документов UK/EN, 1936 для train и 64 для validation. BPE обучается только на train; фактические token counts записываются в metadata.
+- Если local `last.pt` доступен, exact resume с optimizer/masters/scaler/RNG, неизменным recipe/data/source.
+- После потери Colab runtime — warm restart из Drive `weights.pt`, с сохранением весов/step/tokens и сбросом optimizer/RNG/master low bits. Начинается новая optimizer phase.
+- Если snapshot отсутствует, импорт INIT checkpoint либо fresh run.
 
-Первый запуск читает данные через Hugging Face streaming. Если сеть/датасет недоступны, ошибка видна пользователю; автоматической подмены toy data нет. Альтернативный `SOURCE='local'` читает отдельные UTF-8 `.txt` документы из `uk/` и `en/`. Для основной тренировки выбран пользователем Wikipedia.
+Для нового tokenizer/весов выбрать новый RUN_NAME и `RESUME_MODE='fresh'`. Не retrain BPE существующей модели: Engram hash addresses зависят от неизменных token IDs. Exact resume требует совпадения кода и данных; изменение precision/recipe делать явно через warm phase.
 
-## Метрики, сохранение и resume
+## Корпус и кеш
 
-Лог содержит training CE, auxiliary routing loss, UK/EN validation CE/perplexity, gradient norm, загрузку экспертов, tokens/s и peak CUDA allocated/reserved memory. Validation использует фиксированные окна и не сдвигает training sampler. Значения throughput включают overhead интервала логирования и не заменяют отдельный benchmark kernels. После запуска строятся loss curves и карта expert assignments.
+Источник [wikimedia/wikipedia](training-corpus.md), pinned snapshot/revision. Новый предел — 10 000 документов и 30M Unicode characters на язык, max20K/article; fresh validation128/lang. При продолжении сохраняются прежние validation hashes/order и точные BPE bytes; исходные val token files должны совпасть. Реальные document/token counts и ожидаемая степень повторения корпуса печатаются, не предполагаются по nominal caps.
 
-`last.pt` содержит model, optimizer, GradScaler, completed step, tokens_seen и RNG. Сохраняется каждые 100 updates, в конце и по возможности при KeyboardInterrupt. При жёстком обрыве Colab восстанавливается только последний сохранённый checkpoint. При прерывании внутри accumulation частичные gradients не сохраняются; sampler/RNG может уже продвинуться. FP16 overflow вызывает уменьшение GradScaler scale и повтор тех же микробатчей без засчитывания update. OOM, non-finite loss и устойчивые non-finite gradients останавливают запуск с понятным сообщением.
+В Drive лежит `data-v2`; token files копируются в local cache, чтобы train sampler не делал random reads через Drive. Corpus collection ограничен по characters; token files пишутся документами, без огромного общего Python списка всех token IDs. EOS между статьями; attention/GDN не сбрасываются на границе, Engram suffix hashes сбрасываются. Сеть/датасет не заменяются скрытым toy corpus.
 
-Восстановление: сохраните тот же `RUN_NAME`, поставьте `RESUME=True`, выполняйте notebook заново. Требуются неизменные tokenizer, token files, model shape, batch shape и optimizer recipe; содержимое data files проверяется SHA256. `STEPS` — общее число updates; его увеличение меняет будущую cosine LR schedule. Исходные token files и tokenizer берутся из Drive, не создаются заново.
+## Precision и память
 
-Экспорт `model.pt` содержит только модель/config, `tokenizer.json` хранится рядом. Код отдельной загрузки для inference дан в notebook и выключен по умолчанию, чтобы не создавать вторую копию на GPU. Источники и конфигурация достаточны для воспроизведения graph; training resume требует также data files и `last.pt`.
+Модель содержит **293 688 272 parameters**, neural193672208/table100016064. FP16 параметры и gradients модели обновляются через **FP32 master weights и moments**. Scaled model gradients копируются в FP32 masters, после чего half gradients освобождаются; public GradScaler unscale_/clip выполняются на masters. Master update копируется обратно в модель. FP32 GDN recurrence/router сохраняются, scalar decay вычисляется FP32.
 
-Full AdamW checkpoint примерно 3.28 GiB; для atomic replace одновременно нужны старый и временный новый файл. Отдельный model export примерно 1.09 GiB. Рекомендуется минимум 10 GiB свободного диска. Drive mount выполняет пользователь в своём Colab; этот workflow не загружает результаты на Hugging Face или в чужие сервисы.
+FP16 модель не означает FP16 Adam и не гарантирует меньше total VRAM: master copy + transient FP32 gradients тоже занимают место. Старый user run имел peak allocated4.811/reserved5.334 GiB с FP32 parameters/autocast; эти числа не переносятся автоматически на новый recipe. Начать с тех же коротких context/batch и измерить новый peak. Optional AdamW8bit уменьшает moments, но требует CUDA/стабильности проверки; он не включён по умолчанию.
 
-## Границы результата
+GQA использует SDPA с автоматически выбранным backend; FlashAttention зависит от GPU/dtype. GDN — exact triangular PyTorch reference, MoE — no-drop Python dispatch; production kernels не реализованы. Не начинать с 32K на этой реализации.
 
-300 updates × 128 tokens × microbatch 1 × accumulation 4 = **153 600 processed training tokens**, с возможными повторами окон. Это существенно меньше бюджета языковой модели этого размера; связные ответы, знание мира или instruction following не обещаются. Режим `tiny` — исключительно debugging profile и явно не модель 0.2B + 0.1B.
+## Drive до 5 GiB
 
-Генерация пересчитывает последние `SEQ_LEN` tokens и не имеет persistent KV/GDN decode API. Ограничение относится к тестовому runtime, а не к архитектурной цели растущего кеша. В этой версии не проверены 32K/128K/256K, incremental decode equivalence, edits Engram, производительность CUDA kernels и качество long-context recall.
+В Drive сохраняется один `weights.pt` без optimizer, около **0.55 GiB FP16**. Пока пишется временная копия, нужен объём старого + нового snapshot, примерно **1.10 GiB**, плюс corpus/metadata/source/metrics. `PERSISTENT_BUDGET_GIB=4.5` проверяет весь каталог одного run с запасом на temporary save; это не чтение реальной Drive quota и не учёт остальных пользовательских файлов.
 
-Проверки реализации запускаются `python -m pytest tests -q`: GDN chunk outputs и gradients против независимой recurrence, causal prefix/future-token isolation, chunk-size invariance, checkpoint/no-checkpoint gradients, receiver→source KV gradients, Engram reset, параметризация full profile, overfit tiny batch, tokenizer roundtrip и leak-free document split, сохранение/resume optimizer/RNG и генерация. CPU-проверки не заменяют реальный запуск на Colab GPU.
+Full optimizer checkpoint только локально: `LOCAL_DIR/last.pt`, примерно **3.83 GiB** после полного lazy allocation moments. Local atomic overwrite требует около7.66 GiB; Colab runtime disk должен иметь место. Local файл исчезает при завершении runtime. Не создаётся отдельный duplicate `model.pt` и ZIP каталога.
 
-## Проверено в этой среде 12 октября 2026
+При `USE_DRIVE=False` все snapshots находятся в `/content` и тоже исчезнут при потере runtime.
 
-- По следующему запросу пользователя выполнены также **300 updates полного профиля** на CPU с sequence length 32 и искусственным UK/EN diagnostic corpus, затем full checkpoint восстановлен и выполнен 301-й update. [Результаты и границы проверки](cloud-validation.md); это не Wikipedia run или тест default Colab 128/1/4.
-- Девять автоматических проверок прошли, включая исполнение встроенных core cells notebook в режиме tiny/local/CPU, обучение, export и генерацию. Структура notebook валидна; встроенные исходники совпадают с файлами проекта.
-- Полный профиль на **293 688 272 параметра** выполнил forward/backward и один AdamW update на CPU с синтетической последовательностью из 16 токенов. Loss и gradient norm конечные; это проверка исполнимости, не обучение на Wikipedia и не benchmark Colab.
-- Revision и карточка Wikipedia проверены через API. Получение parquet здесь блокирует сетевой policy для `us.aws.cdn.hf.co` (HTTP CONNECT 403). Фактический streaming download и полный запуск на Colab GPU **не проверены**; данные должны загружаться в пользовательском Colab, а source/volume manifest будет создан там.
+Если old last.pt/model.pt уже занимают доступное место в Drive, скачать/освободить ненужные old files самостоятельно после проверки нового weights snapshot. Workflow не удаляет их и не обещает, что пользовательская квота равна заданному budget run. При недостатке места запись останавливается, предыдущий complete snapshot сохраняется.
+
+Цена такой экономии: weights-only snapshot позволяет **warm restart**, но не exact optimizer/RNG восстановление после потери runtime. Если нужен exact resume, нужен full checkpoint на постоянном диске либо отдельно проверенный compact optimizer recipe; память не исчезает от малого active parameter count.
+
+## Метрики и generation
+
+Validation16 fixed windows/lang, independent RNG; новый initial baseline записывается отдельно, values отличаются от старого evaluator. Метрики: CE/ppl, GradScaler/gradient norm, peak VRAM, time data loading, training step throughput без eval/save и interval throughput с overhead. Phase-wide routing counters дополняют last-update assignments; heatmap нормирована по mean load каждого слоя.
+
+Live metrics пишутся локально и копируются в Drive при checkpoint save (каждые500 updates и в конце session). Последний checkpoint не записывается дважды. Ctrl+C пытается сохранить последний завершённый update; жёсткий обрыв сохраняет лишь последний complete snapshot. Частично накопленные gradients не сохраняются.
+
+Generation остаётся коротким prefix recomputation; persistent KV/GDN decode API пока нет. BOS не добавляется, поскольку corpus не обучал его на starts. Нельзя оценивать качество чата по этому продолжению текста: [SFT/chat план](chat-training.md) следует после base training.
+
+## Что проверено
+
+- 13 automated CPU tests: causality, GDN recurrence/gradients, shared K/V gradient, chunk/checkpoint invariance, full profile size, overfit, notebook core cells, master optimizer exact/warm resume, quota failure и сохранение tokenizer/validation при расширении.
+- Новый full FP16-master профиль выполнил два synthetic CPU updates, finite gradients и сохранение weights0.5473/full3.8099 GiB. [Результаты и ограничения](colab-results-and-next-steps.md).
+- Старый полный CPU run: [300 updates + resume](cloud-validation.md). User T4 v1 run: [300 updates на выбранном корпусе](colab-results-and-next-steps.md).
+- Новый FP16-master CUDA/T4 recipe, расширенный Wikipedia download и длительное качество пока не проверены в этой среде. Здесь нет GPU, CDN Wikipedia блокируется network policy.

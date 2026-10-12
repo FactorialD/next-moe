@@ -2,7 +2,9 @@
 
 ## Первый запуск обучения: Colab
 
-По запросу пользователя 12 октября подготовлены [самостоятельный notebook](../notebooks/next_moe_0p2b_engram_0p1b.ipynb) и [инструкция](colab-training.md) для полного малого профиля 0.2B + 0.1B Engram. [Открытый UK/EN Wikipedia corpus](training-corpus.md) закреплён по snapshot/config/revision; default test budget — 2000 документов и 153 600 processed training tokens. Начать с короткой последовательности 128 и проверки loss, routing, VRAM, сохранения и resume. Это технический эксперимент, не подтверждение качества языковой модели. Дальнейшие этапы pretraining → SFT → оценка chat → optional DPO записаны в [chat-training.md](chat-training.md); SFT пока не реализован.
+После пользовательского [T4 run на 300 updates](colab-results-and-next-steps.md) подготовлен workflow v2: stage до10M tokens, сессии, FP16 model/gradients с FP32 masters, compact Drive snapshots с явным warm restart, local exact checkpoints и cache token files. Corpus expansion сохраняет tokenizer/validation. Следующая проверка — 20–50 CUDA updates нового recipe, затем progress около1M tokens; GPU режим v2 пока не измерен. Дальнейшее полноценное pretraining зависит от качества, данных и kernel throughput.
+
+По запросу пользователя 12 октября подготовлены [самостоятельный notebook](../notebooks/next_moe_0p2b_engram_0p1b.ipynb) и [инструкция](colab-training.md) для полного малого профиля 0.2B + 0.1B Engram. [Открытый UK/EN Wikipedia corpus](training-corpus.md) закреплён по snapshot/config/revision; исходный test budget v1 — 2000 документов и 153 600 processed training tokens. Начать с короткой последовательности 128 и проверки loss, routing, VRAM, сохранения и resume. Это технический эксперимент, не подтверждение качества языковой модели. Дальнейшие этапы pretraining → SFT → оценка chat → optional DPO записаны в [chat-training.md](chat-training.md); SFT пока не реализован.
 
 ## Сейчас: определить и проверить архитектуру
 

@@ -53,3 +53,9 @@ MoE снижает compute активных экспертов, но не уст
 Для измерения сравнивать steady-state tokens/s и peak allocated/reserved VRAM после прогрева и lazy allocation optimizer states. Фиксировать GPU, topology, context, microbatch, global batch, dtype, top-k, kernels и distributed layout; отдельно менять 8-bit moments и checkpointing, чтобы различить их эффекты. CPU offload не входит в эти оценки, а ZeRO/FSDP могут добавлять стоимость коммуникации.
 
 Точные peak VRAM и throughput появятся после реализации kernels, distributed layout и профилирования forward/backward/optimizer steps. Для будущего конструктора следует показывать отдельно training states, activation model, transient buffers, степень шардирования и confidence оценки.
+
+## Проверенный T4 run и текущий notebook
+
+Пользовательский v1 run полного малого профиля с FP32 resident parameters/gradients и autocast показал peak allocated4.811/reserved5.334 GiB на context128/microbatch1/accumulation4. [Лог и выводы](colab-results-and-next-steps.md). Это measured point конкретного recipe, а не универсальная ёмкость или значение для длинного контекста.
+
+В v2 на T4 модель/gradients FP16, masters/moments FP32. Во время backward модель2P+grad2P+master4P+moments8P остаётся16P; после копирования/освобождения model gradients временные FP32 optimizer gradients заменяют2P на4P (плюс локальные conversion/workspace peaks). Поэтому переход параметров на16-bit не обещает двукратной экономии total VRAM. Малый weights-only persistent snapshot около0.55 GiB; local full FP16-master checkpoint около3.83 GiB. Persistent storage ограничен ценой явного warm restart без optimizer/RNG, не за счёт бесследного удаления training state. Новый T4 CUDA recipe нужно проверить короткой сессией.

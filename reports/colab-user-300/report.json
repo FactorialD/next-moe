@@ -1,0 +1,179 @@
+{
+  "source": "User-provided Colab log; not rerun by Codex",
+  "gpu": "NVIDIA T4 (confirmed by user)",
+  "steps": 300,
+  "tokens_seen": 153600,
+  "elapsed_minutes": 25.11,
+  "global_tokens_per_second": 101.95141377937078,
+  "peak_allocated_GiB": 4.81105375289917,
+  "peak_reserved_GiB": 5.333984375,
+  "reported_checkpoint_GiB": 3.28,
+  "torch_cuda_version": "not provided",
+  "corpus_metadata": "not provided; Wikipedia selected in notebook. Actual token counts unavailable.",
+  "parameter_recipe": "v1 FP32 model/grad + autocast; inferred from notebook version",
+  "train_ce_excerpt": [
+    {
+      "step": 1,
+      "train_ce": 11.100148439407349
+    },
+    {
+      "step": 10,
+      "train_ce": 11.069377422332764
+    },
+    {
+      "step": 20,
+      "train_ce": 10.602738380432129
+    },
+    {
+      "step": 30,
+      "train_ce": 10.203665494918823
+    },
+    {
+      "step": 40,
+      "train_ce": 9.455052852630615
+    },
+    {
+      "step": 50,
+      "train_ce": 8.574724912643433
+    },
+    {
+      "step": 60,
+      "train_ce": 8.456909418106079
+    },
+    {
+      "step": 70,
+      "train_ce": 8.27232837677002
+    },
+    {
+      "step": 80,
+      "train_ce": 8.395113229751587
+    },
+    {
+      "step": 90,
+      "train_ce": 9.200268030166626
+    },
+    {
+      "step": 100,
+      "train_ce": 8.178996324539185
+    },
+    {
+      "step": 110,
+      "train_ce": 8.445577383041382
+    },
+    {
+      "step": 120,
+      "train_ce": 8.149405002593994
+    },
+    {
+      "step": 130,
+      "train_ce": 8.345970153808594
+    },
+    {
+      "step": 140,
+      "train_ce": 8.558222532272339
+    },
+    {
+      "step": 150,
+      "train_ce": 8.805224895477295
+    },
+    {
+      "step": 160,
+      "train_ce": 8.144724607467651
+    },
+    {
+      "step": 170,
+      "train_ce": 8.329594373703003
+    },
+    {
+      "step": 180,
+      "train_ce": 7.856064200401306
+    },
+    {
+      "step": 190,
+      "train_ce": 8.193703532218933
+    },
+    {
+      "step": 200,
+      "train_ce": 7.98302686214447
+    },
+    {
+      "step": 210,
+      "train_ce": 8.028600692749023
+    },
+    {
+      "step": 220,
+      "train_ce": 8.379592180252075
+    },
+    {
+      "step": 230,
+      "train_ce": 8.10492217540741
+    },
+    {
+      "step": 240,
+      "train_ce": 8.511576652526855
+    },
+    {
+      "step": 250,
+      "train_ce": 8.321608543395996
+    },
+    {
+      "step": 260,
+      "train_ce": 7.996701955795288
+    },
+    {
+      "step": 270,
+      "train_ce": 8.272953152656555
+    },
+    {
+      "step": 280,
+      "train_ce": 7.313870906829834
+    },
+    {
+      "step": 290,
+      "train_ce": 7.735540270805359
+    },
+    {
+      "step": 300,
+      "train_ce": 8.265734553337097
+    }
+  ],
+  "validation": [
+    {
+      "step": 50,
+      "val_ce_uk": 9.293943643569946,
+      "val_ce_en": 8.84486699104309
+    },
+    {
+      "step": 100,
+      "val_ce_uk": 9.12816834449768,
+      "val_ce_en": 8.550105810165405
+    },
+    {
+      "step": 150,
+      "val_ce_uk": 8.94392466545105,
+      "val_ce_en": 8.403566837310791
+    },
+    {
+      "step": 200,
+      "val_ce_uk": 8.852075338363647,
+      "val_ce_en": 8.363169431686401
+    },
+    {
+      "step": 250,
+      "val_ce_uk": 8.772245645523071,
+      "val_ce_en": 8.284490585327148
+    },
+    {
+      "step": 300,
+      "val_ce_uk": 8.711913585662842,
+      "val_ce_en": 8.254602193832397
+    }
+  ],
+  "routing_summary": {
+    "early_max_load_to_mean": 7.96875,
+    "final_max_load_to_mean": 4.78125,
+    "final_unselected_expert_fraction_this_step": 0.0,
+    "scope": "worst layer in each reported update; not semantic expert specialization"
+  },
+  "generation_summary": "Repetitions of frequent tokens and language mixing; not usable language or chat quality."
+}
