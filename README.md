@@ -9,6 +9,7 @@
 - [Результаты 300 шагов полного профиля в облачной среде на CPU](docs/cloud-validation.md).
 - [Пользовательский Colab run на T4: выводы и следующий бюджет](docs/colab-results-and-next-steps.md).
 - [Обучающий корпус: точный источник и количество](docs/training-corpus.md).
+- [Наступні якісні корпуси UK/EN: джерела й рекомендована суміш](docs/future-training-data.md).
 - [Этапы превращения base-модели в чат](docs/chat-training.md).
 - [Память и скорость обучения](docs/training-memory.md).
 - [Экономия квоты Colab: бенчмарк текущего trainer](docs/colab-efficiency.md).

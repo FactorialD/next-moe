@@ -1,0 +1,56 @@
+[
+  {
+    "dataset": "lang-uk/malyuk",
+    "revision": "374a1e3821b3ce94284a293b12ed2f6ba2a8ae63",
+    "card_url": "https://huggingface.co/datasets/lang-uk/malyuk/blob/374a1e3821b3ce94284a293b12ed2f6ba2a8ae63/README.md",
+    "last_repository_update": "2026-07-30T12:27:43.000Z",
+    "declared_packaging_license": null,
+    "checked_on": "2026-10-12",
+    "verification": "Dataset card/API only; no bulk corpus downloaded or independent quality evaluation."
+  },
+  {
+    "dataset": "HPLT/HPLT3.0",
+    "revision": "3394d6ba8dae4da834e3b11771daf95028a960b1",
+    "card_url": "https://huggingface.co/datasets/HPLT/HPLT3.0/blob/3394d6ba8dae4da834e3b11771daf95028a960b1/README.md",
+    "last_repository_update": "2026-07-08T12:37:21.000Z",
+    "declared_packaging_license": "cc0-1.0",
+    "checked_on": "2026-10-12",
+    "verification": "Dataset card/API only; no bulk corpus downloaded or independent quality evaluation."
+  },
+  {
+    "dataset": "HuggingFaceTB/smoltalk2",
+    "revision": "fc6cc2103c066455aade5d7fbb346039ae36ca5e",
+    "card_url": "https://huggingface.co/datasets/HuggingFaceTB/smoltalk2/blob/fc6cc2103c066455aade5d7fbb346039ae36ca5e/README.md",
+    "last_repository_update": "2025-10-31T13:49:55.000Z",
+    "declared_packaging_license": null,
+    "checked_on": "2026-10-12",
+    "verification": "Dataset card/API only; no bulk corpus downloaded or independent quality evaluation."
+  },
+  {
+    "dataset": "HuggingFaceFW/fineweb-edu",
+    "revision": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9",
+    "card_url": "https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu/blob/87f09149ef4734204d70ed1d046ddc9ca3f2b8f9/README.md",
+    "last_repository_update": "2025-07-11T20:16:53.000Z",
+    "declared_packaging_license": "odc-by",
+    "checked_on": "2026-10-12",
+    "verification": "Dataset card/API only; no bulk corpus downloaded or independent quality evaluation."
+  },
+  {
+    "dataset": "HuggingFaceFW/fineweb-2",
+    "revision": "af9c13333eb981300149d5ca60a8e9d659b276b9",
+    "card_url": "https://huggingface.co/datasets/HuggingFaceFW/fineweb-2/blob/af9c13333eb981300149d5ca60a8e9d659b276b9/README.md",
+    "last_repository_update": "2025-10-27T18:32:07.000Z",
+    "declared_packaging_license": "odc-by",
+    "checked_on": "2026-10-12",
+    "verification": "Dataset card/API only; no bulk corpus downloaded or independent quality evaluation."
+  },
+  {
+    "dataset": "HuggingFaceFW/finepdfs-edu",
+    "revision": "9cfabe2127faca99b3d5c4dc6d1fcb397399ebde",
+    "card_url": "https://huggingface.co/datasets/HuggingFaceFW/finepdfs-edu/blob/9cfabe2127faca99b3d5c4dc6d1fcb397399ebde/README.md",
+    "last_repository_update": "2025-11-11T18:49:02.000Z",
+    "declared_packaging_license": "odc-by",
+    "checked_on": "2026-10-12",
+    "verification": "Dataset card/API only; no bulk corpus downloaded or independent quality evaluation."
+  }
+]
