@@ -48,17 +48,25 @@ def test_replay_sampler_restore_and_validation(tmp_path):
     with pytest.raises(ValueError,match='recipe changed'):prepare_replay_data(out,web,wiki,.3)
 
 
-def test_replay_notebook_offline(tmp_path):
+@pytest.mark.parametrize('notebook,starting_tokens,base_name,data_name', [
+    ('next_moe_50m_wikipedia_replay.ipynb',50_001_920,'next-moe-30m-plus20m-webpdf-v1','data-stage3'),
+    ('next_moe_55m_plus10m_replay.ipynb',55_001_920,'next-moe-50m-plus5m-replay-v1','data-replay'),
+    ('next_moe_55m_plus10m_replay.ipynb',55_001_920,'checkpoint-55001920-tokens-frozen','data-replay'),
+])
+def test_replay_notebook_offline(tmp_path,notebook,starting_tokens,base_name,data_name):
     torch.set_num_threads(1)
     import shutil,sys,math,time,gc,subprocess,os
     wiki=tiny_corpus(tmp_path)
-    storage=tmp_path/'drive';base=storage/'next-moe-30m-plus20m-webpdf-v1';base.mkdir(parents=True)
-    web=base/'data-stage3'
-    prepare_continuation_data(web,wiki,tokens_per_language=2000,validation_documents=2,record_sources=source_records())
+    storage=tmp_path/'drive';base=storage/base_name;base.mkdir(parents=True)
+    raw_web=tmp_path/'web'
+    prepare_continuation_data(raw_web,wiki,tokens_per_language=2000,validation_documents=2,record_sources=source_records())
+    web=base/data_name
+    if data_name=='data-replay':prepare_replay_data(web,raw_web,wiki)
+    else:shutil.copytree(raw_web,web)
     t=Trainer(ModelConfig.tiny(),TrainConfig(steps=1,sequence_length=8,accumulation=1,warmup=1,
         eval_batches=1,eval_every=1,save_every=1),web,tmp_path/'oldrun',device='cpu')
-    t.run();t.tokens_seen=50_001_920;t.step=25915;torch.save(t.snapshot(),base/'weights.pt')
-    nb=nbformat.read(ROOT/'notebooks/next_moe_50m_wikipedia_replay.ipynb',as_version=4)
+    t.run();t.tokens_seen=starting_tokens;t.step=25915;torch.save(t.snapshot(),base/'weights.pt')
+    nb=nbformat.read(ROOT/'notebooks'/notebook,as_version=4)
     nbformat.validate(nb);codes=[c.source for c in nb.cells if c.cell_type=='code']
     for s in codes:ast.parse(s)
     env={'torch':torch,'Path':Path,'sys':sys,'json':json,'math':math,'time':time,'gc':gc,
@@ -73,9 +81,9 @@ def test_replay_notebook_offline(tmp_path):
     exec(codes[2],env)
     for name,source in env['SOURCES'].items():assert source==(ROOT/name).read_text()
     for index in (3,4,5,6,7,8,9):exec(codes[index],env)
-    assert env['trainer'].tokens_seen==50_001_984
+    assert env['trainer'].tokens_seen==starting_tokens+64
     assert env['trainer']._replay_sampling_installed
     assert (env['RUN_DIR']/'baseline-validation.json').exists()
     for index in (3,4,5):exec(codes[index],env)
     assert env['trainer'].optimizer.state and env['trainer']._replay_sampling_installed
-    assert env['phase']['target_tokens']==50_001_984
+    assert env['phase']['target_tokens']==starting_tokens+64
