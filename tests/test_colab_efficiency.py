@@ -50,6 +50,7 @@ def test_benchmark_restores_master_weights(tmp_path):
     trainer.run(max_updates=1)
     values=[p.clone() for p in trainer.masters.master]
     scaler=trainer.scaler.state_dict().copy()
-    benchmark_batch_layout(trainer,warmup_updates=0,measured_updates=1,apply_best=False)
+    results=benchmark_batch_layout(trainer,units_per_hour=None,warmup_updates=0,measured_updates=1,apply_best=False)
+    assert all(r['training_tokens_per_unit'] is None for r in results)
     for p,v in zip(trainer.masters.master,values):torch.testing.assert_close(p,v,atol=0,rtol=0)
     assert trainer.scaler.state_dict()==scaler

@@ -5,6 +5,7 @@
 Подготовлен проект архитектуры и обучаемый PyTorch-прототип самого маленького профиля. Полноценное обучение и оценка качества ещё не проведены.
 
 - [Самостоятельный Colab notebook: обучение 0.2B + 0.1B Engram](notebooks/next_moe_0p2b_engram_0p1b.ipynb).
+- [Новий Colab: checkpoint 30M → ще 20M на FineWeb/FinePDFs, benchmark L4](docs/continuation-colab.md).
 - [Инструкция запуска, сохранения и восстановления](docs/colab-training.md).
 - [Результаты 300 шагов полного профиля в облачной среде на CPU](docs/cloud-validation.md).
 - [Пользовательский Colab run на T4: выводы и следующий бюджет](docs/colab-results-and-next-steps.md).

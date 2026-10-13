@@ -58,3 +58,9 @@ Trainer дополнительно сохраняет SHA256 corpus/tokenizer si
 После пользовательского run на T4 следующий эксперимент планируется до **10M processed tokens**, сессиями по1000 updates. Corpus caps: **10000 документов и30M Unicode characters на язык**, max20000/article. Fresh split имеет128 validation documents/lang (при полном отборе9872 train/lang); при продолжении старого checkpoint сохраняются старые validation hashes и tokenizer, так что обычно остаётся32 val/lang. Caps не означают фактический объём: character limit или исчерпание source могут уменьшить document counts.
 
 BPE при продолжении **не retrain**. Правила corpus expansion сохраняют old validation порядок/hash, не допускают эти документы в train и копируют точные tokenizer bytes. Token files записываются документами, затем кешируются локально в Colab. Измерять степень повторения как ожидаемые sampled tokens/lang, делённые на actual train token count; чтение random windows не является полным epoch-pass. [Workflow v2](colab-training.md), [выбор следующих шагов](colab-results-and-next-steps.md).
+
+## Наступний етап після 30M
+
+[Окремий notebook і точні джерела/кількість](continuation-colab.md): ~20M tokens/lang
+із FineWeb2 UK, FineWeb-Edu EN2025 та FinePDFs-Edu UK/EN; 80/20 web/PDF.
+BPE та старий validation незмінні. HPLT не входить до цього recipe.

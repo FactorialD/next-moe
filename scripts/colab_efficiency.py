@@ -66,7 +66,7 @@ def benchmark_batch_layout(trainer, units_per_hour=8.9, warmup_updates=2,
     writes or validation during timing. Full Adam states must already be allocated.
     Absolute CUDA speed must be measured on the user's actual GPU.
     """
-    if units_per_hour <= 0 or measured_updates < 1 or warmup_updates < 0:
+    if (units_per_hour is not None and units_per_hour <= 0) or measured_updates < 1 or warmup_updates < 0:
         raise ValueError('Invalid benchmark settings.')
     updates = warmup_updates + measured_updates
     if trainer.cfg.steps - trainer.step < updates:
@@ -145,7 +145,7 @@ def benchmark_batch_layout(trainer, units_per_hour=8.9, warmup_updates=2,
                           'effective_tokens_per_update': microbatch*accumulation*trainer.cfg.sequence_length,
                           'median_training_tokens_per_second': speed,
                           'units_per_hour_assumed': units_per_hour,
-                          'training_tokens_per_unit': speed*3600/units_per_hour}
+                          'training_tokens_per_unit': speed*3600/units_per_hour if units_per_hour else None}
                 if trainer.device.type == 'cuda':
                     result['peak_allocated_GiB'] = torch.cuda.max_memory_allocated()/2**30
                     result['peak_reserved_GiB'] = torch.cuda.max_memory_reserved()/2**30
