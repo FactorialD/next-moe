@@ -3,6 +3,9 @@ from pathlib import Path
 import hashlib,json
 ROOT=Path(__file__).resolve().parents[1]
 nb=json.loads((ROOT/'notebooks/next_moe_50m_wikipedia_replay.ipynb').read_text())
+# User-added archive/debug cells in the saved run are not part of this workflow.
+# Preserve them in the original notebook, without automatic extra Drive copies.
+nb['cells']=nb['cells'][:21]
 c=nb['cells']
 for cell in c:
     if isinstance(cell['source'],list):cell['source']=''.join(cell['source'])
