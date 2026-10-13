@@ -8,6 +8,7 @@
 - [Новий Colab: checkpoint 30M → ще 20M на FineWeb/FinePDFs, benchmark L4](docs/continuation-colab.md).
 - [Colab після50M:25% Wikipedia replay, короткий+5M етап і графіки](docs/replay-colab.md).
 - [Colab після55M:ще10M на тій самій суміші, графіки та відновлення](docs/replay-10m-colab.md).
+- [RunPod: налаштуванняPod, перенесенняColab checkpoint таJupyter notebook](docs/runpod-setup.md).
 - [Инструкция запуска, сохранения и восстановления](docs/colab-training.md).
 - [Результаты 300 шагов полного профиля в облачной среде на CPU](docs/cloud-validation.md).
 - [Пользовательский Colab run на T4: выводы и следующий бюджет](docs/colab-results-and-next-steps.md).
