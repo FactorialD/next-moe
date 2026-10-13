@@ -5,6 +5,11 @@ import json
 ROOT=Path(__file__).resolve().parents[1]
 nb=json.loads((ROOT/'notebooks/next_moe_30m_to_50m_webpdf.ipynb').read_text())
 c=nb['cells']
+for cell in c:
+    if isinstance(cell['source'],list):cell['source']=''.join(cell['source'])
+    cell['metadata']={}
+    if cell['cell_type']=='code':
+        cell['outputs']=[];cell['execution_count']=None
 c[0]['source']='''# next-moe: checkpoint 50M → короткий Wikipedia replay етап
 
 Продовжуємо з weights.pt 50M. За замовчуванням **ще 5M tokens**, приблизно до55M,
@@ -129,7 +134,8 @@ Local last.pt≈3.83GiB із optimizer; Drive weights≈0.55GiB. Початко�
 Інструкція: https://github.com/FactorialD/next-moe/blob/work/docs/replay-colab.md
 '''
 for i,cell in enumerate(c):cell['id']=f'replay-{i:02d}'
-nb['metadata']['colab']['name']='next_moe_50m_wikipedia_replay.ipynb'
+nb['metadata']={'colab':{'name':'next_moe_50m_wikipedia_replay.ipynb'},
+                'kernelspec':{'display_name':'Python 3','language':'python','name':'python3'}}
 path=ROOT/'notebooks/next_moe_50m_wikipedia_replay.ipynb'
 path.write_text(json.dumps(nb,ensure_ascii=False,indent=1)+'\n')
 print('Built',path.name,len(c),'cells')
