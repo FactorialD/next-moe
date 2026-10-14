@@ -18,6 +18,12 @@ tokens не додаються. Для нового етапу задайте AD
 і новий RUN_NAME. Sampler25%Wikipedia/75%web–PDF, мовний баланс50/50 збережений.
 Compact weights — warm restart; last.pt за наявності — exact migration зі станом Adam.
 На іншому GPU parameter precision має підтримуватися; інакше explicit warm mode.
+
+**Training context2048, microbatch1/accumulation1: ті самі2048 tokens/update.**
+Exact load спочатку відновлює старий recipe512 і Adam, після чого змінюємо context.
+Ціль із phase.json і LR не перезапускаються. Validation512 зберігає старі ключі;
+окремі val_ctx2048_* показують довший контекст. Це зміна recipe, не ідентичний
+старому запуск. Stop тепер перериває також зовнішні цикли після checkpoint saving.
 ''')
 code('''
 import sys,subprocess,json,math,time,gc,shutil,hashlib,os
@@ -47,12 +53,14 @@ STORAGE_PATH = '/workspace/next-moe-runs'
 RUN_NAME = 'runpod-replay-v1'
 ADDITIONAL_TOKENS = 0        # 0 preserves imported phase target; positive = NEW phase
 RESUME_MODE = 'auto'         # auto / warm; different precision requires warm
-SEQ_LEN = 512
-MICROBATCH = 4
+SEQ_LEN = 2048
+VALIDATION_SEQ_LEN = 512
+MICROBATCH = 1
 GRAD_ACCUM = 1
 LEARNING_RATE = 5e-5
 RESTART_WARMUP = 100
 SESSION_UPDATES = None
+RUN_HOURS = None            # optional time limit: remaining rental hours minus a margin
 RUN_BENCHMARK = True
 PRICE_PER_HOUR_USD = .24     # update to YOUR actual Pod GPU price
 SEED = 1234
@@ -63,8 +71,9 @@ CODE_DIR = Path(STORAGE_PATH)/'embedded-code'
 if RUN_DIR.resolve()==INPUT_DIR.resolve():raise ValueError('Use a separate output run.')
 for p in (RUN_DIR,CODE_DIR):p.mkdir(parents=True,exist_ok=True)
 print('Storage free GiB:',shutil.disk_usage(RUN_DIR).free/2**30)
-if shutil.disk_usage(RUN_DIR).free<9*2**30:
-    raise OSError('Keep at least9GiB free for full checkpoint + temporary copy and weights/data.')
+required_free_gib = 5 if (RUN_DIR/'last.pt').exists() else 9
+if shutil.disk_usage(RUN_DIR).free<required_free_gib*2**30:
+    raise OSError(f'Keep at least{required_free_gib}GiB free for full checkpoint + temporary copy and weights/data.')
 ''')
 md('## Вбудований код')
 sources={str(p.relative_to(ROOT)):p.read_text() for p in sorted((ROOT/'next_moe').glob('*.py'))}
@@ -78,7 +87,9 @@ from next_moe.train import Trainer,TrainConfig
 from next_moe.corpus import install_domain_evaluation,install_phase_schedule
 from next_moe.replay import install_replay_sampling,file_hash
 from tokenizers import Tokenizer
-'''+ 'exec('+repr((ROOT/'scripts/colab_efficiency.py').read_text())+')\n')
+'''+ 'exec('+repr((ROOT/'scripts/colab_efficiency.py').read_text())+')\n'
++ 'exec('+repr((ROOT/'scripts/context_training.py').read_text())+')\n'
++ 'exec('+repr((ROOT/'scripts/training_control.py').read_text())+')\n')
 md('''
 ## Перевірка transfer і копіювання незмінного корпусу
 
@@ -154,7 +165,7 @@ if mode=='exact':
         if any(SOURCE_HASHES.get(name)!=value for name,value in old_hashes.items()):
             raise ValueError('Exact migration code changed. Use original code or explicit warm mode.')
     train_cfg=TrainConfig(**header['train_config'])
-    if train_cfg.sequence_length!=SEQ_LEN:raise ValueError('Exact migration seq_len differs; preserve it or warm restart.')
+    # Restore saved recipe exactly, THEN explicitly change context while keeping Adam.
     if train_cfg.precision=='bf16_master' and not native_bf16:
         raise ValueError('Saved BF16 not supported on this GPU. Use RESUME_MODE=warm.')
 else:
@@ -169,6 +180,8 @@ trainer=Trainer(model_cfg,train_cfg,DATA_DIR,RUN_DIR,resume=resume_path,resume_m
 (RUN_DIR/'source_hashes.json').write_text(json.dumps(SOURCE_HASHES,indent=2))
 install_replay_sampling(trainer);fix_evaluation_microbatch(trainer,1);install_domain_evaluation(trainer)
 install_phase_schedule(trainer,phase['initial_tokens'],phase['target_tokens'])
+configure_training_context(trainer,SEQ_LEN,MICROBATCH,GRAD_ACCUM,VALIDATION_SEQ_LEN)
+install_interrupt_safe_run(trainer)
 print('Resume:',mode,'tokens:',trainer.tokens_seen,'target:',phase['target_tokens'])
 print('Initial validation:',trainer.evaluate())
 ''')
@@ -202,7 +215,12 @@ updates й у кінці; після Stop перевірте повідомле�
 ''')
 code('''
 started=time.perf_counter()
-final_metrics=trainer.run(max_updates=SESSION_UPDATES)
+if RUN_HOURS is None:
+    final_metrics=trainer.run(max_updates=SESSION_UPDATES)
+else:
+    training_report=run_for_hours(trainer,hours=RUN_HOURS,chunk_updates=SESSION_UPDATES or 1000)
+    final_metrics=training_report['last_metrics']
+    print(training_report)
 print('Minutes:',(time.perf_counter()-started)/60,'step:',trainer.step,'tokens:',trainer.tokens_seen)
 print('Validation:',final_metrics)
 print('Persistent run:',RUN_DIR)
@@ -211,6 +229,8 @@ _=(RUN_DIR/'pip-freeze.txt').write_text(subprocess.check_output([sys.executable,
 md('## Графіки loss, експертів і швидкості')
 base=json.loads((ROOT/'notebooks/next_moe_55m_plus10m_replay.ipynb').read_text())
 graph=base['cells'][17]['source'].split('baseline=json.loads')[0]
+graph=graph.replace("[('val_ce_', '-'), ('val_new_ce_', '--')]",
+    "[('val_ce_', '-'), ('val_new_ce_', '--'), ('val_ctx2048_ce_', ':'), ('val_ctx2048_new_ce_', '-.')]")
 # A zero-update migrated archive may have no training metrics yet.
 code("if not trainer.log_path.exists():\n    print('No training metrics yet; run an unfinished training stage first.')\nelse:\n"+'\n'.join('    '+line for line in graph.splitlines()))
 md('## Генерація')

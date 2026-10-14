@@ -182,3 +182,43 @@ Restart Kernel (неRestart andRunAll), потім відновити з volume 
 незбережені steps після останньогоcheckpoint, але збереженіAdam/ваги залишаються.
 Перевірка helper: forced interruption наtiny післяпершогоstep, рівно один save,
 відсутністьнаступногоблоку, sourceSHAunchanged і exactcontinuation зsavedAdam.
+
+## Перехід із 512 на 2048 токенів
+
+Оновлений notebook: SEQ_LEN=2048, MICROBATCH=1, GRAD_ACCUM=1,
+VALIDATION_SEQ_LEN=512. Це ті самі 2048 токенів на update. Auto спочатку
+відновлює saved recipe і Adam із last.pt, а потім змінює context у пам'яті.
+Ціль phase.json (наприклад, 300M), LR, Adam, masters і RNG зберігаються.
+Це зміна recipe, а не ідентичне продовження старого запуску.
+
+Залиште RUN_NAME=runpod-replay-v1, ADDITIONAL_TOKENS=0, RESUME_MODE=auto.
+Core source hashes, архітектура, tokenizer і corpus не змінюються.
+Старі val_ce_*/val_new_ce_* оцінюються на 512, нові val_ctx2048_ce_*/
+val_ctx2048_new_ce_* — на 2048. Графіки показують обидва контексти;
+їхні абсолютні CE не порівнювати як одну метрику. Evaluation дорожча.
+
+Зупиніть навчання, дочекайтесь Saved last.pt. Якщо старий while починає новий
+блок, Restart Kernel після save. Завантажте новий notebook окремим файлом:
+
+```bash
+curl -fL https://raw.githubusercontent.com/FactorialD/next-moe/work/notebooks/next_moe_runpod.ipynb \
+  -o /workspace/next-moe/notebooks/next_moe_runpod_2048.ipynb
+```
+
+Для відтворюваності замініть work на SHA оновлення. У Jupyter відкрийте
+next_moe_runpod_2048.ipynb, Restart Kernel, запускайте ячейки по порядку.
+Очікуйте Exact resume, потім Context transition: train=2048, validation=512/2048.
+Вбудовано interrupt-safe handler: Stop зберігає checkpoint і передає
+переривання назовні, щоб зовнішній цикл не почав наступний блок.
+
+Спочатку виконайте benchmark і перевірте VRAM/швидкість, потім навчання.
+За одного фрагмента на update benchmark має один batch layout. При OOM
+попередній checkpoint не перезаписується незавершеним forward. Для повернення
+на 512 задайте SEQ_LEN=512, MICROBATCH=4, GRAD_ACCUM=1 у новому notebook:
+він також дозволяє зворотний transition зі збереженням Adam.
+GPU context2048 тут не перевірений. CPU tests перевіряють збереження Adam,
+RNG, LR, target і tokens/update, незмінну short validation та exact reload.
+
+Для обмеження часу у новому notebook задайте RUN_HOURS за фактичним залишком
+оренди мінус запас. None — до target. Перевірка deadline між блоками, не всередині
+CUDA/save; залиште запас довший за один блок та checkpoint save.

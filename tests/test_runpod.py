@@ -34,8 +34,9 @@ def test_transfer_and_runpod_cells(tmp_path,full):
          'time':time,'gc':gc,'shutil':shutil,'hashlib':hashlib,'os':os,'subprocess':subprocess}
     params=codes[1].replace("'/workspace/next-moe-transfer'",repr(str(input_dir)))
     params=params.replace("'/workspace/next-moe-runs'",repr(str(tmp_path/'volume')))
-    params=params.replace('if shutil.disk_usage(RUN_DIR).free<9*2**30:', 'if False:')
-    exec(params,env);env.update(SEQ_LEN=8,MICROBATCH=2,GRAD_ACCUM=2,RUN_BENCHMARK=False)
+    params=params.replace('if shutil.disk_usage(RUN_DIR).free<required_free_gib*2**30:', 'if False:')
+    exec(params,env);env.update(SEQ_LEN=16,VALIDATION_SEQ_LEN=8,MICROBATCH=1,GRAD_ACCUM=2,
+               RUN_BENCHMARK=False,RUN_HOURS=1 if full else None)
     exec(codes[2],env)
     for name,text in env['SOURCES'].items():assert text==(ROOT/name).read_text()
     for i in (3,4):exec(codes[i],env)
