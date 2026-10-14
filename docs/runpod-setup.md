@@ -150,3 +150,35 @@ CPUtests: compact/fullZIP, SHA manifest, незміннийcorpus, checkpoint/Ad
 migration, fixed imported target, навчання наtiny, graphs/generation, exactreopen,
 відмова за corruptedtransfer. shell script syntax перевірений. Нашасередовищене
 маєCUDAGPU; справжнійsetupCUDA/Jupyter/volume іspeed потребують запускунаRunPod.
+
+## Stop під час timed training
+
+У legacy Trainer.run KeyboardInterrupt перехоплюється: часткові градієнти
+очищуються, checkpoint зберігається, метод повертає evaluation. Тому наївний
+зовнішній while відразу запускає наступний блок. Це помилка timed-loop прикладу.
+
+Для одного запуску без time limit використовуйте trainer.run() без зовнішнього
+while: після обробкиStop наступнийблок не запускається. Дляtime limit:
+
+```python
+import urllib.request
+exec(urllib.request.urlopen(
+    'https://raw.githubusercontent.com/FactorialD/next-moe/work/scripts/training_control.py'
+).read().decode('utf-8'))
+report = run_for_hours(trainer, hours=8, chunk_updates=1000)
+final_metrics = report['last_metrics']
+print(report)
+```
+
+hours — фактичний залишок оренди мінус запас; timeout перевіряється між блоками.
+Helper змінює лише instance method у пам'яті: старий handler зберігає checkpoint,
+потім re-raises KeyboardInterrupt. Зовнішній loop завершується з reason=interrupted.
+Файли next_moe/train.py, source hashes, ваги/Adam не змінюються при встановленні.
+Після reload встановіть helper знову. Після interruption last_metrics може бути
+порожнім або відповідати попередньому блоку; нові метрики отримуйте graph/evaluate.
+
+Якщо старий while уже виконується і не зупиняється: після Saved last.pt
+Restart Kernel (неRestart andRunAll), потім відновити з volume last.pt. Це втрачає
+незбережені steps після останньогоcheckpoint, але збереженіAdam/ваги залишаються.
+Перевірка helper: forced interruption наtiny післяпершогоstep, рівно один save,
+відсутністьнаступногоблоку, sourceSHAunchanged і exactcontinuation зsavedAdam.
